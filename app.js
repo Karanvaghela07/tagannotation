@@ -590,6 +590,7 @@ function toggleSidebar() {
   const overlay = document.querySelector('.sidebar-overlay');
   const isOpen = sidebar.classList.toggle('open');
   overlay.classList.toggle('active', isOpen);
+  document.body.classList.toggle('sidebar-open', isOpen);
   document.body.style.overflow = isOpen ? 'hidden' : '';
 }
 
@@ -598,6 +599,7 @@ function closeSidebar() {
   const overlay = document.querySelector('.sidebar-overlay');
   sidebar.classList.remove('open');
   overlay.classList.remove('active');
+  document.body.classList.remove('sidebar-open');
   document.body.style.overflow = '';
 }
 

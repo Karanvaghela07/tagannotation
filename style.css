@@ -316,7 +316,7 @@ input, select, textarea { font-family: inherit; outline: none; }
   padding: 20px 40px;
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 40;
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -1167,6 +1167,12 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
 .sidebar-overlay.active {
   display: block;
   pointer-events: auto;
+}
+
+/* When sidebar is open on mobile, block all interaction on main content */
+body.sidebar-open .main-content,
+body.sidebar-open .top-bar {
+  pointer-events: none;
 }
 
 /* ============================================
