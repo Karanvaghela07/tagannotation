@@ -134,15 +134,14 @@
                   <div class="form-error">Enter a valid positive number</div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label" for="totalAnnotations">Total Annotations</label>
-                  <input type="number" class="form-input" id="totalAnnotations" placeholder="e.g., 320" min="0">
-                  <div class="form-error">Enter a valid non-negative number</div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" id="addBtn" onclick="addEntry()" style="width:100%; margin-top:4px;">
+                    ✦ Add Entry
+                  </button>
+                  <button class="btn btn-secondary" id="cancelUpdateBtn" onclick="cancelEditEntry()" style="width:100%; margin-top:8px; display:none;">
+                    Cancel Update
+                  </button>
                 </div>
-
-                <button class="btn btn-primary" id="addBtn" onclick="addEntry()" style="width:100%; margin-top:4px;">
-                  ✦ Add Entry
-                </button>
               </div>
             </div>
 

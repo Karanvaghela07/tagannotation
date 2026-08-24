@@ -22,6 +22,7 @@ let processedEntries = [];
 let isFirebaseConnected = false;
 let framesChart = null;
 let annotationsChart = null;
+let editingEntryId = null;
 
 // ---- Initialize Firebase ----
 function initFirebase() {
@@ -115,16 +116,48 @@ function processEntries() {
 }
 
 // ---- Add Entry ----
+function calculateAnnotations(totalFrames) {
+  return Number(totalFrames) * 3;
+}
+
+function setEntryFormForEdit(entry) {
+  editingEntryId = entry.id;
+  const folderInput = document.getElementById('folderName');
+  const framesInput = document.getElementById('totalFrames');
+  const addBtn = document.getElementById('addBtn');
+  const cancelBtn = document.getElementById('cancelUpdateBtn');
+
+  folderInput.value = entry.folderName || '';
+  framesInput.value = entry.totalFrames || '';
+  addBtn.innerHTML = '✦ Update Entry';
+  cancelBtn.style.display = 'block';
+  addBtn.setAttribute('data-mode', 'update');
+}
+
+function cancelEditEntry() {
+  editingEntryId = null;
+  const folderInput = document.getElementById('folderName');
+  const framesInput = document.getElementById('totalFrames');
+  const addBtn = document.getElementById('addBtn');
+  const cancelBtn = document.getElementById('cancelUpdateBtn');
+
+  folderInput.value = '';
+  framesInput.value = '';
+  addBtn.innerHTML = '✦ Add Entry';
+  cancelBtn.style.display = 'none';
+  addBtn.removeAttribute('data-mode');
+  clearFieldError('folderName');
+  clearFieldError('totalFrames');
+}
+
 async function addEntry() {
   const folderInput = document.getElementById('folderName');
   const framesInput = document.getElementById('totalFrames');
-  const annotInput = document.getElementById('totalAnnotations');
 
   const folderName = folderInput.value.trim();
   const totalFrames = parseInt(framesInput.value, 10);
-  const totalAnnotations = parseInt(annotInput.value, 10);
+  const totalAnnotations = calculateAnnotations(totalFrames);
 
-  // Validation
   let hasError = false;
 
   if (!folderName) {
@@ -141,13 +174,6 @@ async function addEntry() {
     clearFieldError('totalFrames');
   }
 
-  if (isNaN(totalAnnotations) || totalAnnotations < 0) {
-    showFieldError('totalAnnotations', 'Enter a valid non-negative annotation count');
-    hasError = true;
-  } else {
-    clearFieldError('totalAnnotations');
-  }
-
   if (hasError) return;
 
   if (!isFirebaseConnected || !entriesRef) {
@@ -157,34 +183,54 @@ async function addEntry() {
 
   const btn = document.getElementById('addBtn');
   btn.classList.add('loading');
-  btn.innerHTML = '<div class="spinner"></div> Adding...';
+  btn.innerHTML = '<div class="spinner"></div> Saving...';
 
   try {
-    const newEntry = {
-      folderName,
-      totalFrames,
-      totalAnnotations,
-      dateAdded: Date.now()
-    };
+    if (editingEntryId) {
+      await db.ref('annotations/' + editingEntryId).update({
+        folderName,
+        totalFrames,
+        totalAnnotations,
+        dateAdded: Date.now()
+      });
+      showToast(`Updated "${folderName}" successfully!`, 'success');
+    } else {
+      const newEntry = {
+        folderName,
+        totalFrames,
+        totalAnnotations,
+        dateAdded: Date.now()
+      };
 
-    await entriesRef.push(newEntry);
+      await entriesRef.push(newEntry);
+      showToast(`Added "${folderName}" successfully!`, 'success');
+    }
 
-    // Reset form
     folderInput.value = '';
     framesInput.value = '';
-    annotInput.value = '';
-
-    showToast(`Added "${folderName}" successfully!`, 'success');
+    editingEntryId = null;
+    btn.innerHTML = '✦ Add Entry';
+    document.getElementById('cancelUpdateBtn').style.display = 'none';
+    btn.removeAttribute('data-mode');
   } catch (error) {
-    console.error('Add error:', error);
-    showToast('Failed to add entry. Check database rules.', 'error');
+    console.error('Save error:', error);
+    showToast(editingEntryId ? 'Failed to update entry.' : 'Failed to add entry. Check database rules.', 'error');
   } finally {
     btn.classList.remove('loading');
-    btn.innerHTML = '✨ Add Entry';
+    if (!editingEntryId) {
+      btn.innerHTML = '✦ Add Entry';
+    }
   }
 }
 
 // ---- Delete Single Entry ----
+function startEditEntry(id) {
+  const entry = allEntries.find(item => item.id === id);
+  if (!entry) return;
+  setEntryFormForEdit(entry);
+  navigateTo('homePage');
+}
+
 function confirmDelete(id, folderName) {
   const overlay = document.getElementById('modalOverlay');
   const message = document.getElementById('modalMessage');
@@ -195,6 +241,9 @@ function confirmDelete(id, folderName) {
     overlay.classList.remove('active');
     try {
       await db.ref('annotations/' + id).remove();
+      if (editingEntryId === id) {
+        cancelEditEntry();
+      }
       showToast(`Deleted "${folderName}"`, 'info');
     } catch (error) {
       console.error('Delete error:', error);
@@ -300,9 +349,10 @@ function renderDataTable() {
         <td><span class="num-annot">${(entry.totalAnnotations || 0).toLocaleString()}</span></td>
         <td><span class="date-cell">${date}</span></td>
         <td>
-          <button class="btn-icon" onclick="confirmDelete('${entry.id}', '${String(entry.folderName).replace(/'/g, "\\'")}')" title="Delete">
-            🗑
-          </button>
+          <div class="table-actions">
+            <button class="table-action-btn" onclick="startEditEntry('${entry.id}')">Update</button>
+            <button class="table-action-btn delete" onclick="confirmDelete('${entry.id}', '${String(entry.folderName).replace(/'/g, "\\'")}')">Delete</button>
+          </div>
         </td>
       </tr>
     `;
@@ -486,8 +536,8 @@ function renderCharts() {
           legend: {
             position: 'bottom',
             labels: {
-              color: '#8b8ba8',
-              font: { family: 'Inter', size: 12, weight: '500' },
+              color: '#334155',
+              font: { family: 'Inter', size: 12, weight: '600' },
               padding: 18,
               usePointStyle: true,
               pointStyleWidth: 8
@@ -523,13 +573,13 @@ function renderCharts() {
         maintainAspectRatio: true,
         scales: {
           x: {
-            ticks: { color: '#8b8ba8', font: { family: 'Inter', size: 11, weight: '500' } },
-            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false }
+            ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } },
+            grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false }
           },
           y: {
             beginAtZero: true,
-            ticks: { color: '#8b8ba8', font: { family: 'Inter', size: 11, weight: '500' } },
-            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false }
+            ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } },
+            grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false }
           }
         },
         plugins: {
@@ -642,7 +692,11 @@ function handleSearch() {
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
 
-  document.getElementById('totalAnnotations')?.addEventListener('keydown', (e) => {
+  document.getElementById('folderName')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addEntry();
+  });
+
+  document.getElementById('totalFrames')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addEntry();
   });
 
