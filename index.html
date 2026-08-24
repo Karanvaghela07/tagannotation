@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CVAT Tag Annotation Tracker — Track video frames and annotations with precision.">
+  <title>CVAT Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+  <!-- ── Toast Container ────────────────────── -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ── Sidebar Overlay (Mobile) ──────────── -->
+  <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ── Delete Confirm Modal ──────────────── -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-icon">⚠️</div>
+      <div class="modal-title">Confirm Delete</div>
+      <div class="modal-message" id="modalMessage">Are you sure?</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" id="modalConfirmBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+
+    <!-- ══════════════════ SIDEBAR ══════════════════ -->
+    <aside class="sidebar">
+
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🏷️</div>
+          <div>
+            <div class="sidebar-logo-text"><span>CVAT</span> Tracker</div>
+            <div class="sidebar-logo-sub">Annotation Manager</div>
+          </div>
+        </div>
+        <button class="sidebar-close-btn" onclick="closeSidebar()">✕</button>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section-label">Navigation</div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item active" data-page="homePage" onclick="navigateTo('homePage')">
+          <span class="nav-icon">⌂</span>
+          <span>Home</span>
+        </div>
+        <div class="nav-item" data-page="dataPage" onclick="navigateTo('dataPage')">
+          <span class="nav-icon">◫</span>
+          <span>Data</span>
+        </div>
+        <div class="nav-item" data-page="dashboardPage" onclick="navigateTo('dashboardPage')">
+          <span class="nav-icon">◈</span>
+          <span>Dashboard</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-badge">
+          <span class="sidebar-footer-badge-dot"></span>
+          Firebase Live
+        </div>
+        <div class="sidebar-footer-info">
+          CVAT Tag Annotation Tracker<br>
+          v1.0 · Real-time sync enabled
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ══════════════════ MAIN CONTENT ══════════════════ -->
+    <main class="main-content">
+
+      <!-- Top Bar -->
+      <div class="top-bar">
+        <div class="top-bar-left">
+          <h1 class="page-title" id="pageTitle">Home</h1>
+        </div>
+        <div class="top-bar-right">
+          <div class="status-badge disconnected" id="connectionStatus">
+            <span class="status-dot"></span>
+            <span>Connecting…</span>
+          </div>
+          <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+        </div>
+      </div>
+
+      <!-- ── Page Content ──────────────────── -->
+      <div class="page-content">
+
+        <!-- ══════════ HOME PAGE ══════════ -->
+        <div class="page active" id="homePage">
+
+          <!-- Welcome Banner -->
+          <div class="welcome-banner">
+            <div class="welcome-eyebrow">✦ Annotation Platform</div>
+            <h2 class="welcome-title">Welcome to <span>CVAT Tracker</span></h2>
+            <p class="welcome-subtitle">Track your video annotations with precision. Add entries below to get started — all data syncs instantly to Firebase.</p>
+          </div>          <div class="home-grid">
+
+            <!-- Add Entry Form -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <div class="card-title-icon">＋</div>
+                  Add New Entry
+                </div>
+              </div>
+
+              <div class="form-container">
+                <div class="form-group">
+                  <label class="form-label" for="folderName">Folder Name</label>
+                  <input type="text" class="form-input" id="folderName" placeholder="e.g., 23424_40_12_0" autocomplete="off">
+                  <div class="form-hint">Format: XXXXX_AA_BB_X — position key extracted from AA_BB</div>
+                  <div class="form-error">Folder name is required</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="totalFrames">Total Frames</label>
+                  <input type="number" class="form-input" id="totalFrames" placeholder="e.g., 1500" min="1">
+                  <div class="form-error">Enter a valid positive number</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="totalAnnotations">Total Annotations</label>
+                  <input type="number" class="form-input" id="totalAnnotations" placeholder="e.g., 320" min="0">
+                  <div class="form-error">Enter a valid non-negative number</div>
+                </div>
+
+                <button class="btn btn-primary" id="addBtn" onclick="addEntry()" style="width:100%; margin-top:4px;">
+                  ✦ Add Entry
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Column: Mini stats + Recent -->
+            <div>
+              <!-- Mini Stats -->
+              <div class="mini-stats">
+                <div class="mini-stat purple">
+                  <div class="mini-stat-val" id="homeTotalVideos">0</div>
+                  <div class="mini-stat-lbl">Videos</div>
+                </div>
+                <div class="mini-stat emerald">
+                  <div class="mini-stat-val" id="homeTotalFrames">0</div>
+                  <div class="mini-stat-lbl">Frames</div>
+                </div>
+                <div class="mini-stat rose">
+                  <div class="mini-stat-val" id="homeTotalAnnotations">0</div>
+                  <div class="mini-stat-lbl">Annotations</div>
+                </div>
+              </div>
+
+              <!-- Recent Entries -->
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">
+                    <div class="card-title-icon">⟳</div>
+                    Recent Entries
+                  </div>
+                </div>
+                <div class="recent-list" id="recentEntries">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <div class="empty-state-text">No entries yet</div>
+                    <div class="empty-state-sub">Add your first entry using the form!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ══════════ DATA PAGE ══════════ -->
+        <div class="page" id="dataPage">
+
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Search folder name…" oninput="handleSearch()" autocomplete="off">
+              </div>
+              <span class="entry-count" id="entryCount">0 entries</span>
+            </div>
+            <div class="action-bar-right">
+              <button class="btn btn-secondary" onclick="exportCSV()">
+                ↓ Export CSV
+              </button>
+              <button class="btn btn-danger" onclick="confirmDeleteAll()">
+                ✕ Delete All
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Series</th>
+                  <th>Video #</th>
+                  <th>Folder Name</th>
+                  <th>Frames</th>
+                  <th>Annotations</th>
+                  <th>Date Added</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="dataTableBody">
+                <tr>
+                  <td colspan="7">
+                    <div class="empty-state">
+                      <div class="empty-state-icon">◫</div>
+                      <div class="empty-state-text">No entries yet</div>
+                      <div class="empty-state-sub">Go to Home to add your first video entry</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <!-- ══════════ DASHBOARD PAGE ══════════ -->
+        <div class="page" id="dashboardPage">
+
+          <div class="stats-grid">
+            <div class="stat-card purple">
+              <div class="stat-card-icon">🎬</div>
+              <div class="stat-card-value" id="dashTotalVideos">0</div>
+              <div class="stat-card-label">Total Videos</div>
+            </div>
+            <div class="stat-card emerald">
+              <div class="stat-card-icon">🎞️</div>
+              <div class="stat-card-value" id="dashTotalFrames">0</div>
+              <div class="stat-card-label">Total Frames</div>
+            </div>
+            <div class="stat-card rose">
+              <div class="stat-card-icon">🏷️</div>
+              <div class="stat-card-value" id="dashTotalAnnotations">0</div>
+              <div class="stat-card-label">Total Annotations</div>
+            </div>
+            <div class="stat-card amber">
+              <div class="stat-card-icon">◈</div>
+              <div class="stat-card-value" id="dashAvgFrames">0</div>
+              <div class="stat-card-label">Avg Frames / Video</div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <div class="card-title-icon">◎</div>
+                  Frames by Position
+                </div>
+              </div>
+              <canvas id="framesChart"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <div class="card-title-icon">▦</div>
+                  Annotations by Position
+                </div>
+              </div>
+              <canvas id="annotationsChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">◈</div>
+                Position Breakdown
+              </div>
+            </div>
+            <div class="table-container" style="border:none; border-radius:var(--r-sm);">
+              <table class="breakdown-table">
+                <thead>
+                  <tr>
+                    <th>Position Key</th>
+                    <th>Videos</th>
+                    <th>Total Frames</th>
+                    <th>Total Annotations</th>
+                  </tr>
+                </thead>
+                <tbody id="positionBreakdown">
+                  <tr>
+                    <td colspan="4">
+                      <div class="empty-state" style="padding:32px;">
+                        <div class="empty-state-icon">◈</div>
+                        <div class="empty-state-text">No data yet</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
