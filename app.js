@@ -84,11 +84,11 @@ function setConnectionStatus(connected) {
 }
 
 // ---- Position Key Extraction ----
-// Folder name format: XXXXX_AA_BB_X -> position key = "AA_BB"
+// Folder name format: XXXXX_AA_BB_CC_X -> position key = "AA_BB_CC"
 function extractPositionKey(folderName) {
   const parts = String(folderName).split('_');
-  if (parts.length >= 4) {
-    return parts[1] + '_' + parts[2];
+  if (parts.length >= 5) {
+    return parts[1] + '_' + parts[2] + '_' + parts[3];
   }
   return folderName;
 }
