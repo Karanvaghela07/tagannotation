@@ -588,15 +588,17 @@ function navigateTo(pageId) {
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const overlay = document.querySelector('.sidebar-overlay');
-  if (sidebar) sidebar.classList.toggle('open');
-  if (overlay) overlay.classList.toggle('active');
+  const isOpen = sidebar.classList.toggle('open');
+  overlay.classList.toggle('active', isOpen);
+  document.body.style.overflow = isOpen ? 'hidden' : '';
 }
 
 function closeSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const overlay = document.querySelector('.sidebar-overlay');
-  if (sidebar) sidebar.classList.remove('open');
-  if (overlay) overlay.classList.remove('active');
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
 }
 
 // ---- Export CSV ----
@@ -640,5 +642,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('totalAnnotations')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addEntry();
+  });
+
+  // Bulletproof touch handling for nav items on mobile
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      const pageId = this.getAttribute('data-page');
+      if (pageId) navigateTo(pageId);
+    }, { passive: false });
   });
 });

@@ -115,16 +115,14 @@ input, select, textarea { font-family: inherit; outline: none; }
    ============================================ */
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--bg-sidebar);
+  background: #0a0a0a;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0; left: 0; bottom: 0;
-  z-index: 1000;
+  z-index: 9998;
   transition: transform var(--t-spring);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
 }
 
 /* subtle top border line */
@@ -217,7 +215,8 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
+  width: 100%;
+  padding: 12px 14px;
   border-radius: 10px;
   color: var(--text-secondary);
   font-size: 13.5px;
@@ -225,7 +224,12 @@ input, select, textarea { font-family: inherit; outline: none; }
   cursor: pointer;
   transition: all var(--t-base);
   position: relative;
-  overflow: hidden;
+  background: transparent;
+  border: none;
+  text-align: left;
+  -webkit-tap-highlight-color: rgba(255,255,255,0.1);
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .nav-item .nav-icon {
@@ -1156,11 +1160,14 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px);
-  z-index: 900;
+  background: rgba(0,0,0,0.65);
+  z-index: 9997;
+  pointer-events: none;
 }
-.sidebar-overlay.active { display: block; }
+.sidebar-overlay.active {
+  display: block;
+  pointer-events: auto;
+}
 
 /* ============================================
    BREAKDOWN TABLE
@@ -1201,16 +1208,19 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
 @media (max-width: 960px) {
   :root { --sidebar-w: 280px; }
 
+  /* Hide sidebar off-screen to the LEFT, slide in on open */
   .sidebar {
-    right: 0;
-    left: auto;
-    border-right: none;
-    border-left: 1px solid var(--border);
-    transform: translateX(110%);
+    left: 0;
+    right: auto;
+    border-right: 1px solid var(--border);
+    border-left: none;
+    transform: translateX(-100%);
+    background: #0a0a0a;
+    z-index: 9998;
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: -20px 0 60px rgba(0,0,0,0.8);
+    box-shadow: 20px 0 60px rgba(0,0,0,0.9);
   }
 
   .sidebar-close-btn { display: flex; }
