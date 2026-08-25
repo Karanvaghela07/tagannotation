@@ -23,6 +23,8 @@ let isFirebaseConnected = false;
 let framesChart = null;
 let annotationsChart = null;
 let editingEntryId = null;
+let dashboardNotesPage = 1;
+const dashboardNotesPerPage = 10;
 
 // ---- Initialize Firebase ----
 function initFirebase() {
@@ -124,11 +126,15 @@ function setEntryFormForEdit(entry) {
   editingEntryId = entry.id;
   const folderInput = document.getElementById('folderName');
   const framesInput = document.getElementById('totalFrames');
+  const statusInput = document.getElementById('videoStatus');
+  const notesInput = document.getElementById('videoNotes');
   const addBtn = document.getElementById('addBtn');
   const cancelBtn = document.getElementById('cancelUpdateBtn');
 
   folderInput.value = entry.folderName || '';
   framesInput.value = entry.totalFrames || '';
+  statusInput.value = entry.status || '';
+  notesInput.value = entry.notes || '';
   addBtn.innerHTML = '✦ Update Entry';
   cancelBtn.style.display = 'block';
   addBtn.setAttribute('data-mode', 'update');
@@ -138,11 +144,15 @@ function cancelEditEntry() {
   editingEntryId = null;
   const folderInput = document.getElementById('folderName');
   const framesInput = document.getElementById('totalFrames');
+  const statusInput = document.getElementById('videoStatus');
+  const notesInput = document.getElementById('videoNotes');
   const addBtn = document.getElementById('addBtn');
   const cancelBtn = document.getElementById('cancelUpdateBtn');
 
   folderInput.value = '';
   framesInput.value = '';
+  statusInput.value = '';
+  notesInput.value = '';
   addBtn.innerHTML = '✦ Add Entry';
   cancelBtn.style.display = 'none';
   addBtn.removeAttribute('data-mode');
@@ -153,9 +163,13 @@ function cancelEditEntry() {
 async function addEntry() {
   const folderInput = document.getElementById('folderName');
   const framesInput = document.getElementById('totalFrames');
+  const statusInput = document.getElementById('videoStatus');
+  const notesInput = document.getElementById('videoNotes');
 
   const folderName = folderInput.value.trim();
   const totalFrames = parseInt(framesInput.value, 10);
+  const status = statusInput.value;
+  const notes = notesInput.value.trim();
   const totalAnnotations = calculateAnnotations(totalFrames);
 
   let hasError = false;
@@ -191,7 +205,8 @@ async function addEntry() {
         folderName,
         totalFrames,
         totalAnnotations,
-        dateAdded: Date.now()
+        status,
+        notes
       });
       showToast(`Updated "${folderName}" successfully!`, 'success');
     } else {
@@ -199,6 +214,8 @@ async function addEntry() {
         folderName,
         totalFrames,
         totalAnnotations,
+        status,
+        notes,
         dateAdded: Date.now()
       };
 
@@ -208,6 +225,8 @@ async function addEntry() {
 
     folderInput.value = '';
     framesInput.value = '';
+    statusInput.value = '';
+    notesInput.value = '';
     editingEntryId = null;
     btn.innerHTML = '✦ Add Entry';
     document.getElementById('cancelUpdateBtn').style.display = 'none';
@@ -316,7 +335,7 @@ function renderDataTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7">
+        <td colspan="8">
           <div class="empty-state">
             <div class="empty-state-icon">📋</div>
             <div class="empty-state-text">${searchTerm ? 'No matching entries found' : 'No entries yet'}</div>
@@ -341,12 +360,25 @@ function renderDataTable() {
       : '-';
 
     return `
-      <tr>
+      <tr class="${getStatusRowClass(entry.status)}">
         <td><span class="series-num">#${entry.seriesNum}</span></td>
         <td><span class="video-num">${entry.positionVideoNum}</span></td>
         <td><span class="folder-name">${entry.folderName}</span></td>
         <td><span class="num-frames">${(entry.totalFrames || 0).toLocaleString()}</span></td>
         <td><span class="num-annot">${(entry.totalAnnotations || 0).toLocaleString()}</span></td>
+        <td>
+          <div class="table-status-cell">
+            <select class="status-select status-${getStatusRowClass(entry.status).replace('status-row-', '')}" onchange="updateEntryStatus('${entry.id}', this.value)">
+              <option value="" ${!entry.status ? 'selected' : ''}>No status</option>
+              <option value="Complete" ${entry.status === 'Complete' ? 'selected' : ''}>Complete</option>
+              <option value="In QA" ${entry.status === 'In QA' ? 'selected' : ''}>In QA</option>
+              <option value="Remaining" ${entry.status === 'Remaining' ? 'selected' : ''}>Remaining</option>
+              <option value="Wrong" ${entry.status === 'Wrong' ? 'selected' : ''}>Wrong</option>
+              <option value="Review" ${entry.status === 'Review' ? 'selected' : ''}>Needs review</option>
+            </select>
+            ${entry.notes ? `<span class="table-note" title="${escapeHtml(entry.notes)}">${escapeHtml(entry.notes)}</span>` : ''}
+          </div>
+        </td>
         <td><span class="date-cell">${date}</span></td>
         <td>
           <div class="table-actions">
@@ -358,13 +390,13 @@ function renderDataTable() {
     `;
   }).join('');
 
-  // Summary row (7 columns total)
+  // Summary row (8 columns total)
   html += `
     <tr class="table-summary">
       <td colspan="3"><strong>TOTALS</strong></td>
       <td><strong>${totalFrames.toLocaleString()}</strong></td>
       <td><strong>${totalAnnotations.toLocaleString()}</strong></td>
-      <td colspan="2"></td>
+      <td colspan="3"></td>
     </tr>
   `;
 
@@ -400,6 +432,7 @@ function renderRecentEntries() {
         <div>
           <div class="recent-item-name">${entry.folderName}</div>
           <div class="recent-item-meta">Position: ${entry.positionKey} · Video #${entry.positionVideoNum}</div>
+          ${entry.status || entry.notes ? `<div class="recent-item-note">${entry.status ? `<span class="status-label status-${entry.status.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '')}">${escapeHtml(entry.status)}</span>` : ''}${entry.notes ? ` ${escapeHtml(entry.notes)}` : ''}</div>` : ''}
         </div>
       </div>
       <div class="recent-item-right">
@@ -443,7 +476,76 @@ function renderDashboard() {
   if (davgEl) davgEl.textContent = avgFrames.toLocaleString();
 
   renderPositionBreakdown();
+  renderDashboardNotes();
   renderCharts();
+}
+
+function renderDashboardNotes() {
+  const container = document.getElementById('dashboardNotes');
+  const pagination = document.getElementById('dashboardPagination');
+  if (!container) return;
+
+  const annotatedEntries = processedEntries.filter(entry => entry.status || entry.notes).slice().reverse();
+  if (annotatedEntries.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:32px;"><div class="empty-state-icon">✎</div><div class="empty-state-text">No notes or statuses yet</div></div>';
+    if (pagination) pagination.hidden = true;
+    return;
+  }
+
+  const totalPages = Math.ceil(annotatedEntries.length / dashboardNotesPerPage);
+  dashboardNotesPage = Math.min(dashboardNotesPage, totalPages);
+  const startIndex = (dashboardNotesPage - 1) * dashboardNotesPerPage;
+  const visibleEntries = annotatedEntries.slice(startIndex, startIndex + dashboardNotesPerPage);
+
+  container.innerHTML = visibleEntries.map(entry => `
+    <div class="dashboard-note-item">
+      <div>
+        <div class="dashboard-note-folder">${escapeHtml(entry.folderName)}</div>
+        <div class="dashboard-note-position">Position: ${escapeHtml(entry.positionKey)} · Video #${entry.positionVideoNum}</div>
+      </div>
+      <div class="dashboard-note-content">
+        ${entry.status ? `<span class="status-label status-${entry.status.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '')}">${escapeHtml(entry.status)}</span>` : ''}
+        ${entry.notes ? `<span class="dashboard-note-text">${escapeHtml(entry.notes)}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  if (pagination) {
+    pagination.hidden = totalPages <= 1;
+    document.getElementById('dashboardPageInfo').textContent = `Page ${dashboardNotesPage} of ${totalPages}`;
+    document.getElementById('dashboardPrevBtn').disabled = dashboardNotesPage === 1;
+    document.getElementById('dashboardNextBtn').disabled = dashboardNotesPage === totalPages;
+  }
+}
+
+function changeDashboardNotesPage(direction) {
+  dashboardNotesPage += direction;
+  renderDashboardNotes();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[character]));
+}
+
+function getStatusRowClass(status) {
+  return status ? `status-row-${String(status).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '')}` : '';
+}
+
+async function updateEntryStatus(id, status) {
+  if (!db) {
+    showToast('Not connected to Firebase!', 'error');
+    return;
+  }
+
+  try {
+    await db.ref('annotations/' + id).update({ status });
+    showToast('Status updated', 'success');
+  } catch (error) {
+    console.error('Status update error:', error);
+    showToast('Failed to update status.', 'error');
+  }
 }
 
 function renderPositionBreakdown() {
@@ -660,13 +762,15 @@ function exportCSV() {
     return;
   }
 
-  const headers = ['Series #', 'Video #', 'Folder Name', 'Total Frames', 'Total Annotations', 'Date Added'];
+  const headers = ['Series #', 'Video #', 'Folder Name', 'Total Frames', 'Total Annotations', 'Status', 'Notes', 'Date Added'];
   const rows = processedEntries.map(e => [
     e.seriesNum,
     e.positionVideoNum,
     `"${e.folderName}"`,
     e.totalFrames,
     e.totalAnnotations,
+    `"${String(e.status || '').replace(/"/g, '""')}"`,
+    `"${String(e.notes || '').replace(/"/g, '""')}"`,
     e.dateAdded ? new Date(e.dateAdded).toLocaleDateString() : ''
   ]);
 
