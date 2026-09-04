@@ -602,16 +602,16 @@ function renderCharts() {
   const annotData = labels.map(k => positionMap[k].annotations);
 
   const chartColors = [
-    'rgba(124, 58, 237, 0.85)',
-    'rgba(6, 182, 212, 0.85)',
-    'rgba(244, 63, 94, 0.85)',
-    'rgba(245, 158, 11, 0.85)',
-    'rgba(16, 185, 129, 0.85)',
-    'rgba(167, 139, 250, 0.85)',
-    'rgba(103, 232, 249, 0.85)',
-    'rgba(253, 164, 175, 0.85)'
+    'rgba(29, 53, 87, 0.88)',
+    'rgba(42, 157, 143, 0.88)',
+    'rgba(69, 123, 157, 0.88)',
+    'rgba(233, 196, 106, 0.95)',
+    'rgba(231, 111, 81, 0.88)',
+    'rgba(76, 114, 145, 0.88)',
+    'rgba(38, 166, 154, 0.88)',
+    'rgba(120, 144, 166, 0.88)'
   ];
-  const chartBorders = chartColors.map(c => c.replace('0.85', '1'));
+  const chartBorders = chartColors.map(c => c.replace(/0\.8[85]/, '1'));
 
   // Frames Chart
   const framesCanvas = document.getElementById('framesChart');
@@ -624,8 +624,8 @@ function renderCharts() {
         labels: labels.length > 0 ? labels : ['No Data'],
         datasets: [{
           data: framesData.length > 0 ? framesData : [1],
-          backgroundColor: framesData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(30,30,50,0.5)'],
-          borderColor: framesData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(60,60,90,0.8)'],
+          backgroundColor: framesData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(148,163,184,0.35)'],
+          borderColor: framesData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(100,116,139,0.6)'],
           borderWidth: 2,
           hoverOffset: 10
         }]
@@ -662,8 +662,8 @@ function renderCharts() {
         datasets: [{
           label: 'Annotations',
           data: annotData.length > 0 ? annotData : [0],
-          backgroundColor: annotData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(30,30,50,0.5)'],
-          borderColor: annotData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(60,60,90,0.8)'],
+          backgroundColor: annotData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(148,163,184,0.35)'],
+          borderColor: annotData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(100,116,139,0.6)'],
           borderWidth: 0,
           borderRadius: 8,
           borderSkipped: false,

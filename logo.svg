@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">CVAT Tracker</title>
+  <desc id="desc">A blue annotation tag inside a video frame</desc>
+  <defs>
+    <linearGradient id="frame" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="tag" x1="19" y1="18" x2="45" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#eff6ff"/>
+  <path d="M18 9H11a2 2 0 0 0-2 2v7M46 9h7a2 2 0 0 1 2 2v7M18 55h-7a2 2 0 0 1-2-2v-7M46 55h7a2 2 0 0 0 2-2v-7" fill="none" stroke="url(#frame)" stroke-linecap="round" stroke-width="4"/>
+  <path d="m22 18 21 7.5v13L30 46l-10-10V22z" fill="url(#tag)"/>
+  <circle cx="27" cy="27" r="3" fill="#fff"/>
+  <path d="m32 29 7 3m-7 4 5 2" stroke="#dbeafe" stroke-linecap="round" stroke-width="2.5"/>
+</svg>
