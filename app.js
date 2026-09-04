@@ -774,7 +774,26 @@ function exportCSV() {
     e.dateAdded ? new Date(e.dateAdded).toLocaleDateString() : ''
   ]);
 
-  const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  const totalVideos = processedEntries.length;
+  const totalFrames = processedEntries.reduce((sum, entry) => sum + (entry.totalFrames || 0), 0);
+  const totalAnnotations = processedEntries.reduce((sum, entry) => sum + (entry.totalAnnotations || 0), 0);
+  const totalCompleted = processedEntries.filter(entry => entry.status === 'Complete').length;
+  const totalRemaining = processedEntries.filter(entry => entry.status === 'Remaining').length;
+  const summaryRows = [
+    [],
+    ['SUMMARY'],
+    ['Total Videos', totalVideos],
+    ['Total Frames', totalFrames],
+    ['Total Annotations', totalAnnotations],
+    ['Total Completed', totalCompleted],
+    ['Total Remaining', totalRemaining]
+  ];
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(',')),
+    ...summaryRows.map(row => row.join(','))
+  ].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
