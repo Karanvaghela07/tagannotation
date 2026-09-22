@@ -477,7 +477,57 @@ function renderDashboard() {
 
   renderPositionBreakdown();
   renderDashboardNotes();
+  renderMinutesTracker();
   renderCharts();
+}
+
+// ---- Minutes Progress Tracker ----
+const TOTAL_TARGET_MINUTES = 1200;
+const FPS = 15;
+
+function renderMinutesTracker() {
+  const totalFrames = processedEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
+  const totalVideos = processedEntries.length;
+
+  // Calculate minutes: frames / (fps * 60)
+  const minutesCompleted = totalFrames / (FPS * 60);
+  const minutesRemaining = Math.max(0, TOTAL_TARGET_MINUTES - minutesCompleted);
+  const percentComplete = Math.min(100, (minutesCompleted / TOTAL_TARGET_MINUTES) * 100);
+
+  // Update stat values
+  const mcEl = document.getElementById('dashMinutesCompleted');
+  const mrEl = document.getElementById('dashMinutesRemaining');
+  const mpEl = document.getElementById('dashMinutesPercent');
+  const mfEl = document.getElementById('dashMinutesFill');
+  const mgEl = document.getElementById('dashMinutesGlow');
+  const mlEl = document.getElementById('dashMinutesCompletedLabel');
+  const tfmEl = document.getElementById('dashTotalFramesMinutes');
+  const tvmEl = document.getElementById('dashTotalVideosMinutes');
+
+  if (mcEl) mcEl.textContent = minutesCompleted.toFixed(2);
+  if (mrEl) mrEl.textContent = minutesRemaining.toFixed(2);
+  if (mpEl) mpEl.textContent = percentComplete.toFixed(2) + '%';
+
+  if (mfEl) mfEl.style.width = percentComplete + '%';
+  if (mgEl) mgEl.style.width = percentComplete + '%';
+
+  if (mlEl) mlEl.textContent = minutesCompleted.toFixed(2) + ' min completed';
+
+  if (tfmEl) tfmEl.textContent = totalFrames.toLocaleString();
+  if (tvmEl) tvmEl.textContent = totalVideos;
+
+  // Update color based on progress
+  if (mfEl) {
+    if (percentComplete >= 100) {
+      mfEl.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+    } else if (percentComplete >= 75) {
+      mfEl.style.background = 'linear-gradient(90deg, #2a9d8f, #10b981)';
+    } else if (percentComplete >= 50) {
+      mfEl.style.background = 'linear-gradient(90deg, #1d3557, #2a9d8f)';
+    } else {
+      mfEl.style.background = 'linear-gradient(90deg, #1d3557, #457b9d)';
+    }
+  }
 }
 
 function renderDashboardNotes() {
@@ -667,7 +717,8 @@ function renderCharts() {
           borderWidth: 0,
           borderRadius: 8,
           borderSkipped: false,
-          barThickness: 36
+          barThickness: 'flex',
+          maxBarThickness: 36
         }]
       },
       options: {

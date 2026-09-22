@@ -280,6 +280,68 @@
             </div>
           </div>
 
+          <!-- Minutes Progress Tracker -->
+          <div class="minutes-tracker-card">
+            <div class="card-header">
+              <div class="card-title">
+                <div class="card-title-icon">⏱</div>
+                Minutes Progress Tracker
+              </div>
+              <div class="minutes-tracker-target">Target: 1,200 min</div>
+            </div>
+
+            <div class="minutes-tracker-stats">
+              <div class="minutes-stat completed">
+                <div class="minutes-stat-icon">✓</div>
+                <div class="minutes-stat-info">
+                  <div class="minutes-stat-value" id="dashMinutesCompleted">0.00</div>
+                  <div class="minutes-stat-label">Minutes Completed</div>
+                </div>
+              </div>
+              <div class="minutes-stat remaining">
+                <div class="minutes-stat-icon">⧖</div>
+                <div class="minutes-stat-info">
+                  <div class="minutes-stat-value" id="dashMinutesRemaining">1,200.00</div>
+                  <div class="minutes-stat-label">Minutes Remaining</div>
+                </div>
+              </div>
+              <div class="minutes-stat percentage">
+                <div class="minutes-stat-icon">◉</div>
+                <div class="minutes-stat-info">
+                  <div class="minutes-stat-value" id="dashMinutesPercent">0.00%</div>
+                  <div class="minutes-stat-label">Progress</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="minutes-progress-wrapper">
+              <div class="minutes-progress-bar">
+                <div class="minutes-progress-fill" id="dashMinutesFill" style="width: 0%"></div>
+                <div class="minutes-progress-glow" id="dashMinutesGlow" style="width: 0%"></div>
+              </div>
+              <div class="minutes-progress-labels">
+                <span>0 min</span>
+                <span id="dashMinutesCompletedLabel">0.00 min completed</span>
+                <span>1,200 min</span>
+              </div>
+            </div>
+
+            <div class="minutes-breakdown" id="minutesBreakdown">
+              <div class="minutes-breakdown-item">
+                <span class="minutes-breakdown-label">Total Frames (all videos)</span>
+                <span class="minutes-breakdown-value" id="dashTotalFramesMinutes">0</span>
+              </div>
+              <div class="minutes-breakdown-item">
+                <span class="minutes-breakdown-label">FPS Rate</span>
+                <span class="minutes-breakdown-value">15 fps</span>
+              </div>
+              <div class="minutes-breakdown-item">
+                <span class="minutes-breakdown-label">Total Videos Contributing</span>
+                <span class="minutes-breakdown-value" id="dashTotalVideosMinutes">0</span>
+              </div>
+            </div>
+          </div>
+
           <div class="charts-grid">
             <div class="chart-card">
               <div class="card-header">
