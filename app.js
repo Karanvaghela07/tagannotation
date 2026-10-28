@@ -25,6 +25,7 @@ let annotationsChart = null;
 let editingEntryId = null;
 let dashboardNotesPage = 1;
 const dashboardNotesPerPage = 10;
+let dataSortOrder = 'desc'; // 'desc' = latest first, 'asc' = oldest first
 
 // ---- Initialize Firebase ----
 function initFirebase() {
@@ -332,7 +333,14 @@ function renderDataTable() {
     e.folderName.toLowerCase().includes(searchTerm)
   );
 
-  if (filtered.length === 0) {
+  // Sort by dateAdded based on current sort order
+  const sorted = filtered.slice().sort((a, b) => {
+    const dateA = a.dateAdded || 0;
+    const dateB = b.dateAdded || 0;
+    return dataSortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+  });
+
+  if (sorted.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8">
@@ -352,7 +360,7 @@ function renderDataTable() {
   let totalFrames = 0;
   let totalAnnotations = 0;
 
-  let html = filtered.map(entry => {
+  let html = sorted.map(entry => {
     totalFrames += (entry.totalFrames || 0);
     totalAnnotations += (entry.totalAnnotations || 0);
     const date = entry.dateAdded
@@ -403,7 +411,7 @@ function renderDataTable() {
   tbody.innerHTML = html;
   const countEl = document.getElementById('entryCount');
   if (countEl) {
-    countEl.textContent = `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`;
+    countEl.textContent = `${sorted.length} ${sorted.length === 1 ? 'entry' : 'entries'}`;
   }
 }
 
@@ -855,6 +863,26 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 
   showToast('CSV exported successfully!', 'success');
+}
+
+// ---- Sort Toggle (Data Page) ----
+function toggleSortOrder() {
+  dataSortOrder = dataSortOrder === 'desc' ? 'asc' : 'desc';
+  const btn = document.getElementById('sortToggleBtn');
+  const label = document.getElementById('sortLabel');
+  const arrows = document.getElementById('sortArrows');
+
+  if (dataSortOrder === 'asc') {
+    btn.classList.add('sort-asc');
+    if (label) label.textContent = 'Oldest First';
+    if (arrows) arrows.textContent = '↑';
+  } else {
+    btn.classList.remove('sort-asc');
+    if (label) label.textContent = 'Latest First';
+    if (arrows) arrows.textContent = '↓';
+  }
+
+  renderDataTable();
 }
 
 // ---- Search Handler ----

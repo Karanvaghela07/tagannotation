@@ -822,6 +822,50 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============================================
+   DATA SORT BAR
+   ============================================ */
+.data-sort-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sort-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  user-select: none;
+}
+.sort-toggle-btn:hover {
+  background: #eef2ff;
+  border-color: rgba(91,91,247,0.25);
+  box-shadow: 0 4px 12px rgba(29,53,87,0.1);
+}
+.sort-toggle-btn:active { transform: scale(0.97); }
+
+.sort-arrows {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--violet);
+  transition: transform var(--t-base);
+  display: inline-block;
+}
+.sort-toggle-btn.sort-asc .sort-arrows {
+  transform: rotate(180deg);
+}
+
+/* ============================================
    ACTION BAR
    ============================================ */
 .action-bar {
