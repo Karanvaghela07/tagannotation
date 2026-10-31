@@ -494,8 +494,10 @@ const TOTAL_TARGET_MINUTES = 1200;
 const FPS = 15;
 
 function renderMinutesTracker() {
-  const totalFrames = processedEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
-  const totalVideos = processedEntries.length;
+  // Only count videos with status "Complete"
+  const completeEntries = processedEntries.filter(e => e.status === 'Complete');
+  const totalFrames = completeEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
+  const totalVideos = completeEntries.length;
 
   // Calculate minutes: frames / (fps * 60)
   const minutesCompleted = totalFrames / (FPS * 60);
