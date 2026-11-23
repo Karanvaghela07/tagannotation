@@ -37,18 +37,92 @@
   <!-- ── Project Manager Modal ─────────────── -->
   <div class="modal-overlay" id="projectModalOverlay">
     <div class="modal project-modal">
-      <div class="modal-icon">📁</div>
-      <div class="modal-title">Manage Projects</div>
-      <div class="project-modal-body">
-        <div class="project-create-row">
-          <input type="text" class="form-input" id="newProjectName" placeholder="New project name…" maxlength="40" autocomplete="off">
-          <button class="btn btn-primary" onclick="createProject()">＋ Create</button>
+
+      <!-- LIST VIEW -->
+      <div id="projectModalListView">
+        <div class="modal-icon">📁</div>
+        <div class="modal-title">Manage Projects</div>
+        <div class="project-modal-body">
+          <button class="btn btn-primary project-new-btn" onclick="openSettingsView(null)">＋ New Project</button>
+          <div id="projectList" class="project-list"></div>
         </div>
-        <div id="projectList" class="project-list"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeProjectModal()">Close</button>
+        </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeProjectModal()">Close</button>
+
+      <!-- SETTINGS VIEW (create or edit) -->
+      <div id="projectModalSettingsView" style="display:none;">
+        <div class="modal-icon">⚙️</div>
+        <div class="modal-title" id="settingsViewTitle">Project Settings</div>
+        <div class="project-settings-body">
+
+          <div class="settings-field">
+            <label class="settings-label">Project Name</label>
+            <input type="text" class="form-input" id="settingsProjectName" placeholder="e.g., Bbox Annotation" maxlength="40" autocomplete="off">
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label">Project Color</label>
+            <div id="colorSwatches" class="color-swatches"></div>
+            <input type="hidden" id="settingsSelectedColor" value="#2a9d8f">
+          </div>
+
+          <div class="settings-section-title">Features</div>
+
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-info">
+              <span class="settings-toggle-label">Minutes Progress Tracker</span>
+              <span class="settings-toggle-desc">Track completion progress against a target duration</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsShowMinutes" onchange="toggleMinutesFields()" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div id="minutesSubFields" class="settings-sub-fields">
+            <div class="settings-field-row">
+              <div class="settings-field half">
+                <label class="settings-label">Target Minutes</label>
+                <input type="number" class="form-input" id="settingsTargetMinutes" value="1200" min="1">
+              </div>
+              <div class="settings-field half">
+                <label class="settings-label">FPS Rate</label>
+                <input type="number" class="form-input" id="settingsFps" value="15" min="1">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-info">
+              <span class="settings-toggle-label">Annotations Column</span>
+              <span class="settings-toggle-desc">Show annotations count (frames × 3) in table and stats</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsShowAnnotations" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-info">
+              <span class="settings-toggle-label">Position Breakdown</span>
+              <span class="settings-toggle-desc">Show breakdown charts by position key (XXXXX_AA_BB_CC format)</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsShowPosition" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="backToProjectList()">← Back</button>
+          <button class="btn btn-primary" id="settingsSaveBtn" onclick="saveProjectSettings()">✦ Create Project</button>
+        </div>
       </div>
+
     </div>
   </div>
 
@@ -205,7 +279,7 @@
                   <div class="mini-stat-val" id="homeTotalFrames">0</div>
                   <div class="mini-stat-lbl">Frames</div>
                 </div>
-                <div class="mini-stat rose">
+                <div class="mini-stat rose" id="homeAnnotMiniStat">
                   <div class="mini-stat-val" id="homeTotalAnnotations">0</div>
                   <div class="mini-stat-lbl">Annotations</div>
                 </div>
@@ -268,7 +342,7 @@
                   <th>Video #</th>
                   <th>Folder Name</th>
                   <th>Frames</th>
-                  <th>Annotations</th>
+                  <th id="annotationsTh">Annotations</th>
                   <th>Status / Notes</th>
                   <th>Date Added</th>
                   <th>Actions</th>
@@ -304,7 +378,7 @@
               <div class="stat-card-value" id="dashTotalFrames">0</div>
               <div class="stat-card-label">Total Frames</div>
             </div>
-            <div class="stat-card rose">
+            <div class="stat-card rose" id="dashAnnotStatCard">
               <div class="stat-card-icon">🏷️</div>
               <div class="stat-card-value" id="dashTotalAnnotations">0</div>
               <div class="stat-card-label">Total Annotations</div>
@@ -369,7 +443,7 @@
               </div>
               <div class="minutes-breakdown-item">
                 <span class="minutes-breakdown-label">FPS Rate</span>
-                <span class="minutes-breakdown-value">15 fps</span>
+                <span class="minutes-breakdown-value" id="dashFpsLabel">15 fps</span>
               </div>
               <div class="minutes-breakdown-item">
                 <span class="minutes-breakdown-label">Complete Videos Contributing</span>
@@ -399,7 +473,7 @@
             </div>
           </div>
 
-          <div class="card">
+          <div class="card" id="positionBreakdownCard">
             <div class="card-header">
               <div class="card-title">
                 <div class="card-title-icon">◈</div>

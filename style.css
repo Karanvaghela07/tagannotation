@@ -1934,3 +1934,194 @@ body.sidebar-open .top-bar {
   background: rgba(244,63,94,0.14);
   border-color: rgba(244,63,94,0.35);
 }
+
+/* ============================================
+   PROJECT SETTINGS VIEW
+   ============================================ */
+.project-modal {
+  width: 500px;
+  max-width: 96vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.project-new-btn {
+  width: 100%;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.project-settings-body {
+  padding: 4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-field {
+  margin-bottom: 16px;
+}
+.settings-field.half { flex: 1; }
+
+.settings-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.settings-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 7px;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px 0 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.settings-sub-fields {
+  padding: 4px 0 8px 4px;
+  border-left: 2px solid var(--border);
+  margin: 4px 0 12px 8px;
+  padding-left: 16px;
+}
+
+/* ---- Toggle Switch ---- */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-toggle-row:last-child { border-bottom: none; }
+
+.settings-toggle-info { flex: 1; min-width: 0; }
+
+.settings-toggle-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.settings-toggle-desc {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(15,23,42,0.12);
+  border-radius: 50px;
+  transition: background var(--t-fast);
+}
+.toggle-switch input:checked ~ .toggle-track {
+  background: var(--cyan);
+}
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  transition: transform var(--t-fast);
+}
+.toggle-switch input:checked ~ .toggle-track .toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* ---- Color Swatches ---- */
+.color-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all var(--t-fast);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+.color-swatch.selected {
+  border-color: #fff;
+  outline: 2px solid currentColor;
+  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* ---- Project Config Badges ---- */
+.project-config-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.project-config-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 50px;
+  background: rgba(148,163,184,0.12);
+  border: 1px solid rgba(148,163,184,0.25);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ---- Settings button in project list ---- */
+.project-settings-btn {
+  font-size: 15px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--t-fast);
+}
+.project-settings-btn:hover {
+  background: rgba(29,53,87,0.07);
+  color: var(--violet);
+  border-color: rgba(29,53,87,0.2);
+}
