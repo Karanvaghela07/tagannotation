@@ -34,6 +34,24 @@
     </div>
   </div>
 
+  <!-- ── Project Manager Modal ─────────────── -->
+  <div class="modal-overlay" id="projectModalOverlay">
+    <div class="modal project-modal">
+      <div class="modal-icon">📁</div>
+      <div class="modal-title">Manage Projects</div>
+      <div class="project-modal-body">
+        <div class="project-create-row">
+          <input type="text" class="form-input" id="newProjectName" placeholder="New project name…" maxlength="40" autocomplete="off">
+          <button class="btn btn-primary" onclick="createProject()">＋ Create</button>
+        </div>
+        <div id="projectList" class="project-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeProjectModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app-container">
 
     <!-- ══════════════════ SIDEBAR ══════════════════ -->
@@ -51,6 +69,16 @@
       </div>
 
       <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section-label">Project
+        <button class="sidebar-manage-btn" onclick="openProjectModal()" title="Manage projects">⚙</button>
+      </div>
+
+      <div class="sidebar-projects" id="sidebarProjects">
+        <!-- project buttons rendered by JS -->
+      </div>
+
+      <div class="sidebar-divider" style="margin-top:12px;"></div>
 
       <div class="sidebar-section-label">Navigation</div>
 
@@ -75,7 +103,7 @@
           Firebase Live
         </div>
         <div class="sidebar-footer-info">
-          CVAT Tag Annotation Tracker<br>
+          Project: <strong id="sidebarActiveProject">—</strong><br>
           v1.0 · Real-time sync enabled
         </div>
       </div>
@@ -89,6 +117,7 @@
       <div class="top-bar">
         <div class="top-bar-left">
           <h1 class="page-title" id="pageTitle">Home</h1>
+          <span class="project-chip" id="topBarProjectChip"></span>
         </div>
         <div class="top-bar-right">
           <div class="status-badge disconnected" id="connectionStatus">

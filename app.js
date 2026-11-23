@@ -17,6 +17,7 @@ const firebaseConfig = {
 // ---- App State ----
 let db = null;
 let entriesRef = null;
+let projectsRef = null;
 let allEntries = [];
 let processedEntries = [];
 let isFirebaseConnected = false;
@@ -27,11 +28,19 @@ let dashboardNotesPage = 1;
 const dashboardNotesPerPage = 10;
 let dataSortOrder = 'desc'; // 'desc' = latest first, 'asc' = oldest first
 
-// ---- Initialize Firebase ----
+// ---- Project State ----
+let activeProjectId = null;
+let activeProjectName = null;
+let allProjects = {}; // { id: { name, createdAt } }
+let entriesListener = null; // current Firebase listener unsubscribe ref
+
+// ============================================
+// FIREBASE INIT
+// ============================================
 function initFirebase() {
   try {
     if (typeof firebase === 'undefined') {
-      console.warn('Firebase SDK script not loaded yet.');
+      console.warn('Firebase SDK not loaded.');
       setConnectionStatus(false);
       return;
     }
@@ -41,39 +50,245 @@ function initFirebase() {
     }
 
     db = firebase.database();
-    entriesRef = db.ref('annotations');
+    projectsRef = db.ref('projects_meta');
 
-    // Listen for real-time updates
-    entriesRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      allEntries = [];
-      if (data) {
-        Object.keys(data).forEach(key => {
-          allEntries.push({ id: key, ...data[key] });
-        });
-        allEntries.sort((a, b) => (a.dateAdded || 0) - (b.dateAdded || 0));
+    // Listen to project list in real time
+    projectsRef.on('value', (snapshot) => {
+      const data = snapshot.val() || {};
+      allProjects = data;
+      renderSidebarProjects();
+
+      // On first load: if no active project, pick the first or seed default
+      if (!activeProjectId) {
+        const ids = Object.keys(data);
+        if (ids.length > 0) {
+          switchProject(ids[0], data[ids[0]].name);
+        } else {
+          // Seed the default "Tag Annotation" project
+          seedDefaultProject();
+        }
       }
-      processEntries();
-      renderDataTable();
-      renderDashboard();
-      renderRecentEntries();
-      updateTotalStats();
-    }, (error) => {
-      console.error('Firebase read error:', error);
-      showToast('Database read error. Check Firebase rules.', 'error');
-      setConnectionStatus(false);
     });
 
     setConnectionStatus(true);
     showToast('Connected to Firebase!', 'success');
-  } catch (error) {
-    console.error('Firebase init error:', error);
+  } catch (err) {
+    console.error('Firebase init error:', err);
     setConnectionStatus(false);
     showToast('Failed to connect to Firebase.', 'error');
   }
 }
 
-// ---- Connection Status ----
+async function seedDefaultProject() {
+  try {
+    const ref = projectsRef.push();
+    await ref.set({ name: 'Tag Annotation', createdAt: Date.now() });
+    // Migrate existing annotations into this project
+    const existing = await db.ref('annotations').once('value');
+    if (existing.val()) {
+      await db.ref(`projects/${ref.key}/annotations`).set(existing.val());
+    }
+  } catch (err) {
+    console.error('Seed default project error:', err);
+  }
+}
+
+// ============================================
+// PROJECT SWITCHING
+// ============================================
+function switchProject(projectId, projectName) {
+  if (activeProjectId === projectId) return;
+
+  // Detach previous listener
+  if (entriesListener && activeProjectId) {
+    db.ref(`projects/${activeProjectId}/annotations`).off('value', entriesListener);
+    entriesListener = null;
+  }
+
+  activeProjectId = projectId;
+  activeProjectName = projectName;
+
+  // Reset state
+  allEntries = [];
+  processedEntries = [];
+  editingEntryId = null;
+  cancelEditEntry();
+
+  entriesRef = db.ref(`projects/${projectId}/annotations`);
+
+  // Subscribe
+  entriesListener = entriesRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    allEntries = [];
+    if (data) {
+      Object.keys(data).forEach(key => {
+        allEntries.push({ id: key, ...data[key] });
+      });
+      allEntries.sort((a, b) => (a.dateAdded || 0) - (b.dateAdded || 0));
+    }
+    processEntries();
+    renderDataTable();
+    renderDashboard();
+    renderRecentEntries();
+    updateTotalStats();
+  }, (error) => {
+    console.error('Firebase read error:', error);
+    showToast('Database read error.', 'error');
+    setConnectionStatus(false);
+  });
+
+  renderSidebarProjects();
+  updateProjectUI();
+  navigateTo('homePage');
+  showToast(`Switched to "${projectName}"`, 'info');
+}
+
+function updateProjectUI() {
+  // Top bar chip
+  const chip = document.getElementById('topBarProjectChip');
+  if (chip) chip.textContent = activeProjectName || '';
+
+  // Sidebar footer
+  const footerEl = document.getElementById('sidebarActiveProject');
+  if (footerEl) footerEl.textContent = activeProjectName || '—';
+}
+
+// ============================================
+// PROJECT SIDEBAR RENDERING
+// ============================================
+function renderSidebarProjects() {
+  const container = document.getElementById('sidebarProjects');
+  if (!container) return;
+
+  const ids = Object.keys(allProjects);
+  if (ids.length === 0) {
+    container.innerHTML = '<div class="sidebar-no-projects">No projects yet</div>';
+    return;
+  }
+
+  container.innerHTML = ids.map(id => {
+    const p = allProjects[id];
+    const isActive = id === activeProjectId;
+    return `
+      <div class="sidebar-project-item ${isActive ? 'active' : ''}" onclick="switchProject('${id}', '${escapeAttr(p.name)}')">
+        <span class="sidebar-project-dot ${isActive ? 'active' : ''}"></span>
+        <span class="sidebar-project-name">${escapeHtml(p.name)}</span>
+        ${isActive ? '<span class="sidebar-project-active-badge">active</span>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeAttr(str) {
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ============================================
+// PROJECT MODAL
+// ============================================
+function openProjectModal() {
+  renderProjectModalList();
+  document.getElementById('projectModalOverlay').classList.add('active');
+  setTimeout(() => document.getElementById('newProjectName')?.focus(), 100);
+}
+
+function closeProjectModal() {
+  document.getElementById('projectModalOverlay').classList.remove('active');
+  document.getElementById('newProjectName').value = '';
+}
+
+function renderProjectModalList() {
+  const container = document.getElementById('projectList');
+  if (!container) return;
+
+  const ids = Object.keys(allProjects);
+  if (ids.length === 0) {
+    container.innerHTML = '<div class="project-list-empty">No projects yet. Create your first one above.</div>';
+    return;
+  }
+
+  container.innerHTML = ids.map(id => {
+    const p = allProjects[id];
+    const isActive = id === activeProjectId;
+    return `
+      <div class="project-list-item ${isActive ? 'active' : ''}">
+        <div class="project-list-item-left">
+          <span class="project-list-dot ${isActive ? 'active' : ''}"></span>
+          <span class="project-list-name">${escapeHtml(p.name)}</span>
+          ${isActive ? '<span class="project-active-badge">active</span>' : ''}
+        </div>
+        <div class="project-list-item-right">
+          ${!isActive ? `<button class="project-switch-btn" onclick="switchProject('${id}', '${escapeAttr(p.name)}'); closeProjectModal()">Switch</button>` : ''}
+          ${ids.length > 1 ? `<button class="project-delete-btn" onclick="confirmDeleteProject('${id}', '${escapeAttr(p.name)}')">✕</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function createProject() {
+  const input = document.getElementById('newProjectName');
+  const name = input.value.trim();
+  if (!name) {
+    input.focus();
+    showToast('Enter a project name', 'error');
+    return;
+  }
+  if (!db) { showToast('Not connected to Firebase!', 'error'); return; }
+
+  // Check for duplicate name
+  const existing = Object.values(allProjects).find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    showToast('A project with that name already exists', 'error');
+    return;
+  }
+
+  try {
+    const ref = projectsRef.push();
+    await ref.set({ name, createdAt: Date.now() });
+    input.value = '';
+    showToast(`Project "${name}" created!`, 'success');
+    renderProjectModalList();
+    // Auto-switch to the new project
+    switchProject(ref.key, name);
+    closeProjectModal();
+  } catch (err) {
+    console.error('Create project error:', err);
+    showToast('Failed to create project.', 'error');
+  }
+}
+
+function confirmDeleteProject(projectId, projectName) {
+  const overlay = document.getElementById('modalOverlay');
+  const message = document.getElementById('modalMessage');
+  message.textContent = `Delete project "${projectName}" and ALL its data? This cannot be undone.`;
+  overlay.classList.add('active');
+
+  document.getElementById('modalConfirmBtn').onclick = async () => {
+    overlay.classList.remove('active');
+    try {
+      await db.ref(`projects/${projectId}`).remove();
+      await db.ref(`projects_meta/${projectId}`).remove();
+      showToast(`Project "${projectName}" deleted`, 'info');
+      renderProjectModalList();
+      // If deleted the active project, switch to first remaining
+      if (activeProjectId === projectId) {
+        activeProjectId = null;
+        const remaining = Object.keys(allProjects).filter(id => id !== projectId);
+        if (remaining.length > 0) {
+          switchProject(remaining[0], allProjects[remaining[0]].name);
+        }
+      }
+    } catch (err) {
+      console.error('Delete project error:', err);
+      showToast('Failed to delete project.', 'error');
+    }
+  };
+}
+
+// ============================================
+// CONNECTION STATUS
+// ============================================
 function setConnectionStatus(connected) {
   isFirebaseConnected = connected;
   const badge = document.getElementById('connectionStatus');
@@ -87,8 +302,9 @@ function setConnectionStatus(connected) {
   }
 }
 
-// ---- Position Key Extraction ----
-// Folder name format: XXXXX_AA_BB_CC_X -> position key = "AA_BB_CC"
+// ============================================
+// POSITION KEY EXTRACTION
+// ============================================
 function extractPositionKey(folderName) {
   const parts = String(folderName).split('_');
   if (parts.length >= 5) {
@@ -97,48 +313,37 @@ function extractPositionKey(folderName) {
   return folderName;
 }
 
-// ---- Process Entries: Assign continuous series # and position video # ----
+// ============================================
+// PROCESS ENTRIES
+// ============================================
 function processEntries() {
   const positionCounters = {};
   processedEntries = allEntries.map((entry, index) => {
     const positionKey = extractPositionKey(entry.folderName);
-
-    if (positionCounters[positionKey] === undefined) {
-      positionCounters[positionKey] = 0;
-    }
+    if (positionCounters[positionKey] === undefined) positionCounters[positionKey] = 0;
     const positionVideoNum = positionCounters[positionKey];
     positionCounters[positionKey]++;
-
-    return {
-      ...entry,
-      seriesNum: index + 1,
-      positionKey,
-      positionVideoNum
-    };
+    return { ...entry, seriesNum: index + 1, positionKey, positionVideoNum };
   });
 }
 
-// ---- Add Entry ----
+// ============================================
+// ENTRY CRUD
+// ============================================
 function calculateAnnotations(totalFrames) {
   return Number(totalFrames) * 3;
 }
 
 function setEntryFormForEdit(entry) {
   editingEntryId = entry.id;
-  const folderInput = document.getElementById('folderName');
-  const framesInput = document.getElementById('totalFrames');
-  const statusInput = document.getElementById('videoStatus');
-  const notesInput = document.getElementById('videoNotes');
+  document.getElementById('folderName').value = entry.folderName || '';
+  document.getElementById('totalFrames').value = entry.totalFrames || '';
+  document.getElementById('videoStatus').value = entry.status || '';
+  document.getElementById('videoNotes').value = entry.notes || '';
   const addBtn = document.getElementById('addBtn');
-  const cancelBtn = document.getElementById('cancelUpdateBtn');
-
-  folderInput.value = entry.folderName || '';
-  framesInput.value = entry.totalFrames || '';
-  statusInput.value = entry.status || '';
-  notesInput.value = entry.notes || '';
   addBtn.innerHTML = '✦ Update Entry';
-  cancelBtn.style.display = 'block';
   addBtn.setAttribute('data-mode', 'update');
+  document.getElementById('cancelUpdateBtn').style.display = 'block';
 }
 
 function cancelEditEntry() {
@@ -150,51 +355,37 @@ function cancelEditEntry() {
   const addBtn = document.getElementById('addBtn');
   const cancelBtn = document.getElementById('cancelUpdateBtn');
 
-  folderInput.value = '';
-  framesInput.value = '';
-  statusInput.value = '';
-  notesInput.value = '';
-  addBtn.innerHTML = '✦ Add Entry';
-  cancelBtn.style.display = 'none';
-  addBtn.removeAttribute('data-mode');
+  if (folderInput) folderInput.value = '';
+  if (framesInput) framesInput.value = '';
+  if (statusInput) statusInput.value = '';
+  if (notesInput) notesInput.value = '';
+  if (addBtn) { addBtn.innerHTML = '✦ Add Entry'; addBtn.removeAttribute('data-mode'); }
+  if (cancelBtn) cancelBtn.style.display = 'none';
   clearFieldError('folderName');
   clearFieldError('totalFrames');
 }
 
 async function addEntry() {
-  const folderInput = document.getElementById('folderName');
-  const framesInput = document.getElementById('totalFrames');
-  const statusInput = document.getElementById('videoStatus');
-  const notesInput = document.getElementById('videoNotes');
+  if (!activeProjectId) {
+    showToast('No project selected. Create or select a project first.', 'error');
+    return;
+  }
 
-  const folderName = folderInput.value.trim();
-  const totalFrames = parseInt(framesInput.value, 10);
-  const status = statusInput.value;
-  const notes = notesInput.value.trim();
+  const folderName = document.getElementById('folderName').value.trim();
+  const totalFrames = parseInt(document.getElementById('totalFrames').value, 10);
+  const status = document.getElementById('videoStatus').value;
+  const notes = document.getElementById('videoNotes').value.trim();
   const totalAnnotations = calculateAnnotations(totalFrames);
 
   let hasError = false;
+  if (!folderName) { showFieldError('folderName', 'Folder name is required'); hasError = true; }
+  else clearFieldError('folderName');
 
-  if (!folderName) {
-    showFieldError('folderName', 'Folder name is required');
-    hasError = true;
-  } else {
-    clearFieldError('folderName');
-  }
-
-  if (isNaN(totalFrames) || totalFrames <= 0) {
-    showFieldError('totalFrames', 'Enter a valid positive number of frames');
-    hasError = true;
-  } else {
-    clearFieldError('totalFrames');
-  }
+  if (isNaN(totalFrames) || totalFrames <= 0) { showFieldError('totalFrames', 'Enter a valid positive number of frames'); hasError = true; }
+  else clearFieldError('totalFrames');
 
   if (hasError) return;
-
-  if (!isFirebaseConnected || !entriesRef) {
-    showToast('Not connected to Firebase!', 'error');
-    return;
-  }
+  if (!isFirebaseConnected || !entriesRef) { showToast('Not connected to Firebase!', 'error'); return; }
 
   const btn = document.getElementById('addBtn');
   btn.classList.add('loading');
@@ -202,48 +393,32 @@ async function addEntry() {
 
   try {
     if (editingEntryId) {
-      await db.ref('annotations/' + editingEntryId).update({
-        folderName,
-        totalFrames,
-        totalAnnotations,
-        status,
-        notes
+      await db.ref(`projects/${activeProjectId}/annotations/${editingEntryId}`).update({
+        folderName, totalFrames, totalAnnotations, status, notes
       });
       showToast(`Updated "${folderName}" successfully!`, 'success');
     } else {
-      const newEntry = {
-        folderName,
-        totalFrames,
-        totalAnnotations,
-        status,
-        notes,
-        dateAdded: Date.now()
-      };
-
-      await entriesRef.push(newEntry);
+      await entriesRef.push({ folderName, totalFrames, totalAnnotations, status, notes, dateAdded: Date.now() });
       showToast(`Added "${folderName}" successfully!`, 'success');
     }
 
-    folderInput.value = '';
-    framesInput.value = '';
-    statusInput.value = '';
-    notesInput.value = '';
+    document.getElementById('folderName').value = '';
+    document.getElementById('totalFrames').value = '';
+    document.getElementById('videoStatus').value = '';
+    document.getElementById('videoNotes').value = '';
     editingEntryId = null;
     btn.innerHTML = '✦ Add Entry';
     document.getElementById('cancelUpdateBtn').style.display = 'none';
     btn.removeAttribute('data-mode');
-  } catch (error) {
-    console.error('Save error:', error);
-    showToast(editingEntryId ? 'Failed to update entry.' : 'Failed to add entry. Check database rules.', 'error');
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast(editingEntryId ? 'Failed to update entry.' : 'Failed to add entry.', 'error');
   } finally {
     btn.classList.remove('loading');
-    if (!editingEntryId) {
-      btn.innerHTML = '✦ Add Entry';
-    }
+    if (!editingEntryId) btn.innerHTML = '✦ Add Entry';
   }
 }
 
-// ---- Delete Single Entry ----
 function startEditEntry(id) {
   const entry = allEntries.find(item => item.id === id);
   if (!entry) return;
@@ -253,44 +428,36 @@ function startEditEntry(id) {
 
 function confirmDelete(id, folderName) {
   const overlay = document.getElementById('modalOverlay');
-  const message = document.getElementById('modalMessage');
-  message.textContent = `Are you sure you want to delete "${folderName}"? This action cannot be undone.`;
+  document.getElementById('modalMessage').textContent = `Are you sure you want to delete "${folderName}"? This action cannot be undone.`;
   overlay.classList.add('active');
 
   document.getElementById('modalConfirmBtn').onclick = async () => {
     overlay.classList.remove('active');
     try {
-      await db.ref('annotations/' + id).remove();
-      if (editingEntryId === id) {
-        cancelEditEntry();
-      }
+      await db.ref(`projects/${activeProjectId}/annotations/${id}`).remove();
+      if (editingEntryId === id) cancelEditEntry();
       showToast(`Deleted "${folderName}"`, 'info');
-    } catch (error) {
-      console.error('Delete error:', error);
+    } catch (err) {
+      console.error('Delete error:', err);
       showToast('Failed to delete. Try again.', 'error');
     }
   };
 }
 
-// ---- Delete All Entries ----
 function confirmDeleteAll() {
-  if (processedEntries.length === 0) {
-    showToast('No entries to delete', 'info');
-    return;
-  }
+  if (processedEntries.length === 0) { showToast('No entries to delete', 'info'); return; }
 
   const overlay = document.getElementById('modalOverlay');
-  const message = document.getElementById('modalMessage');
-  message.textContent = `Are you sure you want to delete ALL ${processedEntries.length} entries? This cannot be undone.`;
+  document.getElementById('modalMessage').textContent = `Delete ALL ${processedEntries.length} entries in "${activeProjectName}"? This cannot be undone.`;
   overlay.classList.add('active');
 
   document.getElementById('modalConfirmBtn').onclick = async () => {
     overlay.classList.remove('active');
     try {
-      await db.ref('annotations').set(null);
+      await db.ref(`projects/${activeProjectId}/annotations`).set(null);
       showToast('All entries deleted', 'info');
-    } catch (error) {
-      console.error('Delete all error:', error);
+    } catch (err) {
+      console.error('Delete all error:', err);
       showToast('Failed to delete all. Try again.', 'error');
     }
   };
@@ -300,16 +467,15 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('active');
 }
 
-// ---- Field Validation Helpers ----
+// ============================================
+// FIELD VALIDATION
+// ============================================
 function showFieldError(fieldId, message) {
   const input = document.getElementById(fieldId);
   if (!input) return;
   const error = input.parentElement.querySelector('.form-error');
   input.classList.add('error');
-  if (error) {
-    error.textContent = message;
-    error.classList.add('visible');
-  }
+  if (error) { error.textContent = message; error.classList.add('visible'); }
 }
 
 function clearFieldError(fieldId) {
@@ -317,23 +483,19 @@ function clearFieldError(fieldId) {
   if (!input) return;
   const error = input.parentElement.querySelector('.form-error');
   input.classList.remove('error');
-  if (error) {
-    error.classList.remove('visible');
-  }
+  if (error) error.classList.remove('visible');
 }
 
-// ---- Render Data Table ----
+// ============================================
+// RENDER DATA TABLE
+// ============================================
 function renderDataTable() {
   const tbody = document.getElementById('dataTableBody');
   if (!tbody) return;
 
   const searchTerm = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const filtered = processedEntries.filter(e => e.folderName.toLowerCase().includes(searchTerm));
 
-  const filtered = processedEntries.filter(e =>
-    e.folderName.toLowerCase().includes(searchTerm)
-  );
-
-  // Sort by dateAdded based on current sort order
   const sorted = filtered.slice().sort((a, b) => {
     const dateA = a.dateAdded || 0;
     const dateB = b.dateAdded || 0;
@@ -342,16 +504,13 @@ function renderDataTable() {
 
   if (sorted.length === 0) {
     tbody.innerHTML = `
-      <tr>
-        <td colspan="8">
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <div class="empty-state-text">${searchTerm ? 'No matching entries found' : 'No entries yet'}</div>
-            <div class="empty-state-sub">${searchTerm ? 'Try a different search term' : 'Go to Home to add your first video entry'}</div>
-          </div>
-        </td>
-      </tr>
-    `;
+      <tr><td colspan="8">
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-text">${searchTerm ? 'No matching entries found' : 'No entries yet'}</div>
+          <div class="empty-state-sub">${searchTerm ? 'Try a different search term' : 'Go to Home to add your first video entry'}</div>
+        </div>
+      </td></tr>`;
     const countEl = document.getElementById('entryCount');
     if (countEl) countEl.textContent = '0 entries';
     return;
@@ -394,42 +553,37 @@ function renderDataTable() {
             <button class="table-action-btn delete" onclick="confirmDelete('${entry.id}', '${String(entry.folderName).replace(/'/g, "\\'")}')">Delete</button>
           </div>
         </td>
-      </tr>
-    `;
+      </tr>`;
   }).join('');
 
-  // Summary row (8 columns total)
   html += `
     <tr class="table-summary">
       <td colspan="3"><strong>TOTALS</strong></td>
       <td><strong>${totalFrames.toLocaleString()}</strong></td>
       <td><strong>${totalAnnotations.toLocaleString()}</strong></td>
       <td colspan="3"></td>
-    </tr>
-  `;
+    </tr>`;
 
   tbody.innerHTML = html;
   const countEl = document.getElementById('entryCount');
-  if (countEl) {
-    countEl.textContent = `${sorted.length} ${sorted.length === 1 ? 'entry' : 'entries'}`;
-  }
+  if (countEl) countEl.textContent = `${sorted.length} ${sorted.length === 1 ? 'entry' : 'entries'}`;
 }
 
-// ---- Render Recent Entries (Home Page) ----
+// ============================================
+// RENDER RECENT ENTRIES
+// ============================================
 function renderRecentEntries() {
   const container = document.getElementById('recentEntries');
   if (!container) return;
 
   const recent = processedEntries.slice(-5).reverse();
-
   if (recent.length === 0) {
     container.innerHTML = `
-      <div class="empty-state" style="padding: 30px 10px;">
+      <div class="empty-state" style="padding:30px 10px;">
         <div class="empty-state-icon">📭</div>
         <div class="empty-state-text">No entries yet</div>
         <div class="empty-state-sub">Add your first entry above!</div>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
@@ -447,11 +601,12 @@ function renderRecentEntries() {
         <span class="recent-frames">${(entry.totalFrames || 0).toLocaleString()} fr</span>
         <span class="recent-annot">${(entry.totalAnnotations || 0).toLocaleString()} ann</span>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ---- Update Total Stats (Home Mini Stats) ----
+// ============================================
+// HOME MINI STATS
+// ============================================
 function updateTotalStats() {
   const totalVideos = processedEntries.length;
   const totalFrames = processedEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
@@ -460,13 +615,14 @@ function updateTotalStats() {
   const vEl = document.getElementById('homeTotalVideos');
   const fEl = document.getElementById('homeTotalFrames');
   const aEl = document.getElementById('homeTotalAnnotations');
-
   if (vEl) vEl.textContent = totalVideos;
   if (fEl) fEl.textContent = totalFrames.toLocaleString();
   if (aEl) aEl.textContent = totalAnnotations.toLocaleString();
 }
 
-// ---- Render Dashboard ----
+// ============================================
+// RENDER DASHBOARD
+// ============================================
 function renderDashboard() {
   const totalVideos = processedEntries.length;
   const totalFrames = processedEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
@@ -477,7 +633,6 @@ function renderDashboard() {
   const dfEl = document.getElementById('dashTotalFrames');
   const daEl = document.getElementById('dashTotalAnnotations');
   const davgEl = document.getElementById('dashAvgFrames');
-
   if (dvEl) dvEl.textContent = totalVideos;
   if (dfEl) dfEl.textContent = totalFrames.toLocaleString();
   if (daEl) daEl.textContent = totalAnnotations.toLocaleString();
@@ -489,22 +644,21 @@ function renderDashboard() {
   renderCharts();
 }
 
-// ---- Minutes Progress Tracker ----
+// ============================================
+// MINUTES PROGRESS TRACKER
+// ============================================
 const TOTAL_TARGET_MINUTES = 1200;
 const FPS = 15;
 
 function renderMinutesTracker() {
-  // Only count videos with status "Complete"
   const completeEntries = processedEntries.filter(e => e.status === 'Complete');
   const totalFrames = completeEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
   const totalVideos = completeEntries.length;
 
-  // Calculate minutes: frames / (fps * 60)
   const minutesCompleted = totalFrames / (FPS * 60);
   const minutesRemaining = Math.max(0, TOTAL_TARGET_MINUTES - minutesCompleted);
   const percentComplete = Math.min(100, (minutesCompleted / TOTAL_TARGET_MINUTES) * 100);
 
-  // Update stat values
   const mcEl = document.getElementById('dashMinutesCompleted');
   const mrEl = document.getElementById('dashMinutesRemaining');
   const mpEl = document.getElementById('dashMinutesPercent');
@@ -517,29 +671,23 @@ function renderMinutesTracker() {
   if (mcEl) mcEl.textContent = minutesCompleted.toFixed(2);
   if (mrEl) mrEl.textContent = minutesRemaining.toFixed(2);
   if (mpEl) mpEl.textContent = percentComplete.toFixed(2) + '%';
-
   if (mfEl) mfEl.style.width = percentComplete + '%';
   if (mgEl) mgEl.style.width = percentComplete + '%';
-
   if (mlEl) mlEl.textContent = minutesCompleted.toFixed(2) + ' min completed';
-
   if (tfmEl) tfmEl.textContent = totalFrames.toLocaleString();
   if (tvmEl) tvmEl.textContent = totalVideos;
 
-  // Update color based on progress
   if (mfEl) {
-    if (percentComplete >= 100) {
-      mfEl.style.background = 'linear-gradient(90deg, #10b981, #059669)';
-    } else if (percentComplete >= 75) {
-      mfEl.style.background = 'linear-gradient(90deg, #2a9d8f, #10b981)';
-    } else if (percentComplete >= 50) {
-      mfEl.style.background = 'linear-gradient(90deg, #1d3557, #2a9d8f)';
-    } else {
-      mfEl.style.background = 'linear-gradient(90deg, #1d3557, #457b9d)';
-    }
+    if (percentComplete >= 100)      mfEl.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+    else if (percentComplete >= 75)  mfEl.style.background = 'linear-gradient(90deg, #2a9d8f, #10b981)';
+    else if (percentComplete >= 50)  mfEl.style.background = 'linear-gradient(90deg, #1d3557, #2a9d8f)';
+    else                             mfEl.style.background = 'linear-gradient(90deg, #1d3557, #457b9d)';
   }
 }
 
+// ============================================
+// DASHBOARD NOTES
+// ============================================
 function renderDashboardNotes() {
   const container = document.getElementById('dashboardNotes');
   const pagination = document.getElementById('dashboardPagination');
@@ -567,8 +715,7 @@ function renderDashboardNotes() {
         ${entry.status ? `<span class="status-label status-${entry.status.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '')}">${escapeHtml(entry.status)}</span>` : ''}
         ${entry.notes ? `<span class="dashboard-note-text">${escapeHtml(entry.notes)}</span>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 
   if (pagination) {
     pagination.hidden = totalPages <= 1;
@@ -583,10 +730,13 @@ function changeDashboardNotesPage(direction) {
   renderDashboardNotes();
 }
 
+// ============================================
+// HELPERS
+// ============================================
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, character => ({
+  return String(value ?? '').replace(/[&<>'"]/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  }[character]));
+  }[c]));
 }
 
 function getStatusRowClass(status) {
@@ -594,44 +744,34 @@ function getStatusRowClass(status) {
 }
 
 async function updateEntryStatus(id, status) {
-  if (!db) {
-    showToast('Not connected to Firebase!', 'error');
-    return;
-  }
-
+  if (!db) { showToast('Not connected to Firebase!', 'error'); return; }
   try {
-    await db.ref('annotations/' + id).update({ status });
+    await db.ref(`projects/${activeProjectId}/annotations/${id}`).update({ status });
     showToast('Status updated', 'success');
-  } catch (error) {
-    console.error('Status update error:', error);
+  } catch (err) {
+    console.error('Status update error:', err);
     showToast('Failed to update status.', 'error');
   }
 }
 
+// ============================================
+// POSITION BREAKDOWN
+// ============================================
 function renderPositionBreakdown() {
   const tbody = document.getElementById('positionBreakdown');
   if (!tbody) return;
 
   const positionMap = {};
   processedEntries.forEach(entry => {
-    if (!positionMap[entry.positionKey]) {
-      positionMap[entry.positionKey] = { videos: 0, frames: 0, annotations: 0 };
-    }
+    if (!positionMap[entry.positionKey]) positionMap[entry.positionKey] = { videos: 0, frames: 0, annotations: 0 };
     positionMap[entry.positionKey].videos++;
     positionMap[entry.positionKey].frames += (entry.totalFrames || 0);
     positionMap[entry.positionKey].annotations += (entry.totalAnnotations || 0);
   });
 
   const positions = Object.keys(positionMap);
-
   if (positions.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="4" style="text-align:center; color: var(--text-muted); padding: 30px;">
-          No data to display
-        </td>
-      </tr>
-    `;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:30px;">No data to display</td></tr>`;
     return;
   }
 
@@ -641,18 +781,18 @@ function renderPositionBreakdown() {
       <td><strong>${positionMap[key].videos}</strong></td>
       <td>${positionMap[key].frames.toLocaleString()}</td>
       <td>${positionMap[key].annotations.toLocaleString()}</td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
 
+// ============================================
+// CHARTS
+// ============================================
 function renderCharts() {
   if (typeof Chart === 'undefined') return;
 
   const positionMap = {};
   processedEntries.forEach(entry => {
-    if (!positionMap[entry.positionKey]) {
-      positionMap[entry.positionKey] = { frames: 0, annotations: 0 };
-    }
+    if (!positionMap[entry.positionKey]) positionMap[entry.positionKey] = { frames: 0, annotations: 0 };
     positionMap[entry.positionKey].frames += (entry.totalFrames || 0);
     positionMap[entry.positionKey].annotations += (entry.totalAnnotations || 0);
   });
@@ -662,23 +802,17 @@ function renderCharts() {
   const annotData = labels.map(k => positionMap[k].annotations);
 
   const chartColors = [
-    'rgba(29, 53, 87, 0.88)',
-    'rgba(42, 157, 143, 0.88)',
-    'rgba(69, 123, 157, 0.88)',
-    'rgba(233, 196, 106, 0.95)',
-    'rgba(231, 111, 81, 0.88)',
-    'rgba(76, 114, 145, 0.88)',
-    'rgba(38, 166, 154, 0.88)',
-    'rgba(120, 144, 166, 0.88)'
+    'rgba(29,53,87,0.88)', 'rgba(42,157,143,0.88)', 'rgba(69,123,157,0.88)',
+    'rgba(233,196,106,0.95)', 'rgba(231,111,81,0.88)', 'rgba(76,114,145,0.88)',
+    'rgba(38,166,154,0.88)', 'rgba(120,144,166,0.88)'
   ];
   const chartBorders = chartColors.map(c => c.replace(/0\.8[85]/, '1'));
 
-  // Frames Chart
   const framesCanvas = document.getElementById('framesChart');
   if (framesCanvas) {
-    const framesCtx = framesCanvas.getContext('2d');
+    const ctx = framesCanvas.getContext('2d');
     if (framesChart) framesChart.destroy();
-    framesChart = new Chart(framesCtx, {
+    framesChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
         labels: labels.length > 0 ? labels : ['No Data'],
@@ -686,36 +820,21 @@ function renderCharts() {
           data: framesData.length > 0 ? framesData : [1],
           backgroundColor: framesData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(148,163,184,0.35)'],
           borderColor: framesData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(100,116,139,0.6)'],
-          borderWidth: 2,
-          hoverOffset: 10
+          borderWidth: 2, hoverOffset: 10
         }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '65%',
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              color: '#334155',
-              font: { family: 'Inter', size: 12, weight: '600' },
-              padding: 18,
-              usePointStyle: true,
-              pointStyleWidth: 8
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: true, cutout: '65%',
+        plugins: { legend: { position: 'bottom', labels: { color: '#334155', font: { family: 'Inter', size: 12, weight: '600' }, padding: 18, usePointStyle: true, pointStyleWidth: 8 } } }
       }
     });
   }
 
-  // Annotations Bar Chart
   const annotCanvas = document.getElementById('annotationsChart');
   if (annotCanvas) {
-    const annotCtx = annotCanvas.getContext('2d');
+    const ctx = annotCanvas.getContext('2d');
     if (annotationsChart) annotationsChart.destroy();
-    annotationsChart = new Chart(annotCtx, {
+    annotationsChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels.length > 0 ? labels : ['No Data'],
@@ -724,56 +843,40 @@ function renderCharts() {
           data: annotData.length > 0 ? annotData : [0],
           backgroundColor: annotData.length > 0 ? chartColors.slice(0, labels.length) : ['rgba(148,163,184,0.35)'],
           borderColor: annotData.length > 0 ? chartBorders.slice(0, labels.length) : ['rgba(100,116,139,0.6)'],
-          borderWidth: 0,
-          borderRadius: 8,
-          borderSkipped: false,
-          barThickness: 'flex',
-          maxBarThickness: 36
+          borderWidth: 0, borderRadius: 8, borderSkipped: false, barThickness: 'flex', maxBarThickness: 36
         }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: true,
+        responsive: true, maintainAspectRatio: true,
         scales: {
-          x: {
-            ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } },
-            grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } },
-            grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false }
-          }
+          x: { ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } }, grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false } },
+          y: { beginAtZero: true, ticks: { color: '#334155', font: { family: 'Inter', size: 11, weight: '600' } }, grid: { color: 'rgba(15,23,42,0.07)', drawBorder: false } }
         },
-        plugins: {
-          legend: { display: false }
-        }
+        plugins: { legend: { display: false } }
       }
     });
   }
 }
 
-// ---- Toast Notifications ----
+// ============================================
+// TOAST
+// ============================================
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
-
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `<span class="toast-dot"></span> ${message}`;
-
   const duration = 3000;
   toast.style.animationDuration = '0.4s, 0.4s';
   toast.style.animationDelay = `0s, ${duration / 1000}s`;
-
   container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, duration + 400);
+  setTimeout(() => toast.remove(), duration + 400);
 }
 
-// ---- Navigation ----
+// ============================================
+// NAVIGATION
+// ============================================
 function navigateTo(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const targetPage = document.getElementById(pageId);
@@ -782,22 +885,38 @@ function navigateTo(pageId) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`.nav-item[data-page="${pageId}"]`)?.classList.add('active');
 
-  const titles = {
-    'homePage':      'Home',
-    'dataPage':      'Data',
-    'dashboardPage': 'Dashboard'
-  };
+  const titles = { homePage: 'Home', dataPage: 'Data', dashboardPage: 'Dashboard' };
   const pageTitleEl = document.getElementById('pageTitle');
   if (pageTitleEl) pageTitleEl.textContent = titles[pageId] || 'Home';
 
   closeSidebar();
-
-  if (pageId === 'dashboardPage') {
-    setTimeout(() => renderCharts(), 120);
-  }
+  if (pageId === 'dashboardPage') setTimeout(() => renderCharts(), 120);
 }
 
-// ---- Mobile Sidebar Drawer ----
+// ============================================
+// SORT TOGGLE
+// ============================================
+function toggleSortOrder() {
+  dataSortOrder = dataSortOrder === 'desc' ? 'asc' : 'desc';
+  const btn = document.getElementById('sortToggleBtn');
+  const label = document.getElementById('sortLabel');
+  const arrows = document.getElementById('sortArrows');
+
+  if (dataSortOrder === 'asc') {
+    btn.classList.add('sort-asc');
+    if (label) label.textContent = 'Oldest First';
+    if (arrows) arrows.textContent = '↑';
+  } else {
+    btn.classList.remove('sort-asc');
+    if (label) label.textContent = 'Latest First';
+    if (arrows) arrows.textContent = '↓';
+  }
+  renderDataTable();
+}
+
+// ============================================
+// SIDEBAR
+// ============================================
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const overlay = document.querySelector('.sidebar-overlay');
@@ -816,38 +935,37 @@ function closeSidebar() {
   document.body.style.overflow = '';
 }
 
-// ---- Export CSV ----
+// ============================================
+// SEARCH
+// ============================================
+function handleSearch() {
+  renderDataTable();
+}
+
+// ============================================
+// EXPORT CSV
+// ============================================
 function exportCSV() {
-  if (processedEntries.length === 0) {
-    showToast('No data to export', 'info');
-    return;
-  }
+  if (processedEntries.length === 0) { showToast('No data to export', 'info'); return; }
 
   const headers = ['Series #', 'Video #', 'Folder Name', 'Total Frames', 'Total Annotations', 'Status', 'Notes', 'Date Added'];
   const rows = processedEntries.map(e => [
-    e.seriesNum,
-    e.positionVideoNum,
-    `"${e.folderName}"`,
-    e.totalFrames,
-    e.totalAnnotations,
+    e.seriesNum, e.positionVideoNum, `"${e.folderName}"`, e.totalFrames, e.totalAnnotations,
     `"${String(e.status || '').replace(/"/g, '""')}"`,
     `"${String(e.notes || '').replace(/"/g, '""')}"`,
     e.dateAdded ? new Date(e.dateAdded).toLocaleDateString() : ''
   ]);
 
   const totalVideos = processedEntries.length;
-  const totalFrames = processedEntries.reduce((sum, entry) => sum + (entry.totalFrames || 0), 0);
-  const totalAnnotations = processedEntries.reduce((sum, entry) => sum + (entry.totalAnnotations || 0), 0);
-  const totalCompleted = processedEntries.filter(entry => entry.status === 'Complete').length;
-  const totalRemaining = processedEntries.filter(entry => entry.status === 'Remaining').length;
+  const totalFrames = processedEntries.reduce((sum, e) => sum + (e.totalFrames || 0), 0);
+  const totalAnnotations = processedEntries.reduce((sum, e) => sum + (e.totalAnnotations || 0), 0);
+  const totalCompleted = processedEntries.filter(e => e.status === 'Complete').length;
+  const totalRemaining = processedEntries.filter(e => e.status === 'Remaining').length;
+
   const summaryRows = [
-    [],
-    ['SUMMARY'],
-    ['Total Videos', totalVideos],
-    ['Total Frames', totalFrames],
-    ['Total Annotations', totalAnnotations],
-    ['Total Completed', totalCompleted],
-    ['Total Remaining', totalRemaining]
+    [], ['SUMMARY'], ['Project', activeProjectName || ''],
+    ['Total Videos', totalVideos], ['Total Frames', totalFrames],
+    ['Total Annotations', totalAnnotations], ['Total Completed', totalCompleted], ['Total Remaining', totalRemaining]
   ];
 
   const csvContent = [
@@ -855,56 +973,38 @@ function exportCSV() {
     ...rows.map(row => row.join(',')),
     ...summaryRows.map(row => row.join(','))
   ].join('\n');
+
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement('a');
   a.href = url;
-  a.download = `cvat_annotation_data_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `cvat_${(activeProjectName || 'project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-
   showToast('CSV exported successfully!', 'success');
 }
 
-// ---- Sort Toggle (Data Page) ----
-function toggleSortOrder() {
-  dataSortOrder = dataSortOrder === 'desc' ? 'asc' : 'desc';
-  const btn = document.getElementById('sortToggleBtn');
-  const label = document.getElementById('sortLabel');
-  const arrows = document.getElementById('sortArrows');
-
-  if (dataSortOrder === 'asc') {
-    btn.classList.add('sort-asc');
-    if (label) label.textContent = 'Oldest First';
-    if (arrows) arrows.textContent = '↑';
-  } else {
-    btn.classList.remove('sort-asc');
-    if (label) label.textContent = 'Latest First';
-    if (arrows) arrows.textContent = '↓';
-  }
-
-  renderDataTable();
-}
-
-// ---- Search Handler ----
-function handleSearch() {
-  renderDataTable();
-}
-
-// ---- Initialize ----
+// ============================================
+// INIT
+// ============================================
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();
 
   document.getElementById('folderName')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addEntry();
   });
-
   document.getElementById('totalFrames')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addEntry();
   });
+  document.getElementById('newProjectName')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createProject();
+  });
 
-  // Bulletproof touch handling for nav items on mobile
+  // Close project modal on overlay click
+  document.getElementById('projectModalOverlay')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('projectModalOverlay')) closeProjectModal();
+  });
+
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('touchend', function(e) {
       e.preventDefault();
