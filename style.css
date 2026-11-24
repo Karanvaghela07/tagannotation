@@ -2199,3 +2199,47 @@ body.sidebar-open .top-bar {
   opacity: 0.65;
   flex-shrink: 0;
 }
+
+/* ============================================
+   SIDEBAR PER-PROJECT DELETE
+   ============================================ */
+.sidebar-project-delete {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--t-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+.sidebar-project-item:hover .sidebar-project-delete { opacity: 1; }
+.sidebar-project-delete:hover {
+  background: rgba(244,63,94,0.12);
+  color: var(--rose);
+}
+.sidebar-project-item.active .sidebar-project-delete { opacity: 0.55; }
+
+/* touch devices always show delete */
+@media (hover: none) {
+  .sidebar-project-delete { opacity: 1; }
+}
+
+/* ============================================
+   PROJECT LIST NAME ROW
+   ============================================ */
+.project-list-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}

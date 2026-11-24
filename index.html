@@ -59,33 +59,7 @@
 
           <div class="settings-field">
             <label class="settings-label">Project Name</label>
-            <input type="text" class="form-input" id="settingsProjectName" placeholder="e.g., Bbox Annotation" maxlength="40" autocomplete="off">
-          </div>
-
-          <div class="settings-field">
-            <label class="settings-label">Project Type</label>
-            <div class="project-type-options">
-              <label class="project-type-option">
-                <input type="radio" name="settingsProjectType" value="video" checked onchange="toggleTypeFields()">
-                <div class="project-type-card">
-                  <div class="project-type-icon">🎬</div>
-                  <div class="project-type-info">
-                    <div class="project-type-name">Video / Tag Annotation</div>
-                    <div class="project-type-desc">Frames, tag annotations (×3), minutes tracker, position breakdown</div>
-                  </div>
-                </div>
-              </label>
-              <label class="project-type-option">
-                <input type="radio" name="settingsProjectType" value="bbox" onchange="toggleTypeFields()">
-                <div class="project-type-card">
-                  <div class="project-type-icon">🟦</div>
-                  <div class="project-type-info">
-                    <div class="project-type-name">BBox / Frame Annotation</div>
-                    <div class="project-type-desc">Frames + manual bounding box count per folder, no minutes tracker</div>
-                  </div>
-                </div>
-              </label>
-            </div>
+            <input type="text" class="form-input" id="settingsProjectName" placeholder="e.g., Polygon Annotation" maxlength="40" autocomplete="off">
           </div>
 
           <div class="settings-field">
@@ -94,12 +68,38 @@
             <input type="hidden" id="settingsSelectedColor" value="#2a9d8f">
           </div>
 
-          <div class="settings-section-title">Features</div>
+          <div class="settings-section-title">Entry Fields</div>
 
-          <div class="settings-toggle-row" id="minutesTrackerRow">
+          <div class="settings-field-row">
+            <div class="settings-field half">
+              <label class="settings-label">Item Name (plural)</label>
+              <input type="text" class="form-input" id="settingsItemLabel" placeholder="e.g., Videos, Folders, Images" maxlength="24" autocomplete="off" value="Videos">
+              <div class="form-hint">What one entry is called — shows on stats &amp; labels</div>
+            </div>
+            <div class="settings-field half">
+              <label class="settings-label">Metric Name</label>
+              <input type="text" class="form-input" id="settingsMetricLabel" placeholder="e.g., Polygons, BBoxes, Keypoints" maxlength="24" autocomplete="off" value="Annotations">
+              <div class="form-hint">The second countable column</div>
+            </div>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-info">
+              <span class="settings-toggle-label">Show Metric Column</span>
+              <span class="settings-toggle-desc">Display the custom metric column in table and stats</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsShowMetric" onchange="toggleMetricFields()" checked>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="settings-section-title">Dashboard Features</div>
+
+          <div class="settings-toggle-row">
             <div class="settings-toggle-info">
               <span class="settings-toggle-label">Minutes Progress Tracker</span>
-              <span class="settings-toggle-desc">Track completion progress against a target duration (Video type only)</span>
+              <span class="settings-toggle-desc">Track completion progress against a target duration</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="settingsShowMinutes" onchange="toggleMinutesFields()" checked>
@@ -122,19 +122,8 @@
 
           <div class="settings-toggle-row">
             <div class="settings-toggle-info">
-              <span class="settings-toggle-label" id="annotationsToggleLabel">Annotations Column</span>
-              <span class="settings-toggle-desc" id="annotationsToggleDesc">Show annotations count in table and stats</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingsShowAnnotations" checked>
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </div>
-
-          <div class="settings-toggle-row" id="positionBreakdownRow">
-            <div class="settings-toggle-info">
               <span class="settings-toggle-label">Position Breakdown</span>
-              <span class="settings-toggle-desc">Show breakdown charts by position key — XXXXX_AA_BB_CC format (Video type only)</span>
+              <span class="settings-toggle-desc">Show breakdown charts by position key — XXXXX_AA_BB_CC format</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="settingsShowPosition" checked>
@@ -264,11 +253,11 @@
                   <div class="form-error">Enter a valid positive number</div>
                 </div>
 
-                <!-- BBox annotation count — shown only for bbox projects -->
-                <div class="form-group" id="annotFormGroup" style="display:none;">
-                  <label class="form-label" id="annotFieldLabel" for="totalAnnotationsInput">Total Bounding Boxes</label>
+                <!-- Custom metric — label set per project, always manual entry -->
+                <div class="form-group" id="annotFormGroup">
+                  <label class="form-label" id="annotFieldLabel" for="totalAnnotationsInput">Total Annotations</label>
                   <input type="number" class="form-input" id="totalAnnotationsInput" placeholder="e.g., 4200" min="0">
-                  <div class="form-hint">Total number of bounding boxes in this folder</div>
+                  <div class="form-hint" id="annotFieldHint">Total annotations in this video</div>
                 </div>
 
                 <div class="form-group">
@@ -516,11 +505,11 @@
             <div class="table-container" style="border:none; border-radius:var(--r-sm);">
               <table class="breakdown-table">
                 <thead>
-                  <tr>
+                  <tr id="positionBreakdownHead">
                     <th>Position Key</th>
-                    <th>Videos</th>
+                    <th>Items</th>
                     <th>Total Frames</th>
-                    <th>Total Annotations</th>
+                    <th>Metric Total</th>
                   </tr>
                 </thead>
                 <tbody id="positionBreakdown">
