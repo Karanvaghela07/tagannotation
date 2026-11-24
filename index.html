@@ -63,6 +63,32 @@
           </div>
 
           <div class="settings-field">
+            <label class="settings-label">Project Type</label>
+            <div class="project-type-options">
+              <label class="project-type-option">
+                <input type="radio" name="settingsProjectType" value="video" checked onchange="toggleTypeFields()">
+                <div class="project-type-card">
+                  <div class="project-type-icon">🎬</div>
+                  <div class="project-type-info">
+                    <div class="project-type-name">Video / Tag Annotation</div>
+                    <div class="project-type-desc">Frames, tag annotations (×3), minutes tracker, position breakdown</div>
+                  </div>
+                </div>
+              </label>
+              <label class="project-type-option">
+                <input type="radio" name="settingsProjectType" value="bbox" onchange="toggleTypeFields()">
+                <div class="project-type-card">
+                  <div class="project-type-icon">🟦</div>
+                  <div class="project-type-info">
+                    <div class="project-type-name">BBox / Frame Annotation</div>
+                    <div class="project-type-desc">Frames + manual bounding box count per folder, no minutes tracker</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-field">
             <label class="settings-label">Project Color</label>
             <div id="colorSwatches" class="color-swatches"></div>
             <input type="hidden" id="settingsSelectedColor" value="#2a9d8f">
@@ -70,10 +96,10 @@
 
           <div class="settings-section-title">Features</div>
 
-          <div class="settings-toggle-row">
+          <div class="settings-toggle-row" id="minutesTrackerRow">
             <div class="settings-toggle-info">
               <span class="settings-toggle-label">Minutes Progress Tracker</span>
-              <span class="settings-toggle-desc">Track completion progress against a target duration</span>
+              <span class="settings-toggle-desc">Track completion progress against a target duration (Video type only)</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="settingsShowMinutes" onchange="toggleMinutesFields()" checked>
@@ -96,8 +122,8 @@
 
           <div class="settings-toggle-row">
             <div class="settings-toggle-info">
-              <span class="settings-toggle-label">Annotations Column</span>
-              <span class="settings-toggle-desc">Show annotations count (frames × 3) in table and stats</span>
+              <span class="settings-toggle-label" id="annotationsToggleLabel">Annotations Column</span>
+              <span class="settings-toggle-desc" id="annotationsToggleDesc">Show annotations count in table and stats</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="settingsShowAnnotations" checked>
@@ -105,10 +131,10 @@
             </label>
           </div>
 
-          <div class="settings-toggle-row">
+          <div class="settings-toggle-row" id="positionBreakdownRow">
             <div class="settings-toggle-info">
               <span class="settings-toggle-label">Position Breakdown</span>
-              <span class="settings-toggle-desc">Show breakdown charts by position key (XXXXX_AA_BB_CC format)</span>
+              <span class="settings-toggle-desc">Show breakdown charts by position key — XXXXX_AA_BB_CC format (Video type only)</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="settingsShowPosition" checked>
@@ -211,8 +237,8 @@
           <!-- Welcome Banner -->
           <div class="welcome-banner">
             <div class="welcome-eyebrow">✦ Annotation Platform</div>
-            <h2 class="welcome-title">Welcome to <span>CVAT Tracker</span></h2>
-            <p class="welcome-subtitle">Track your video annotations with precision. Add entries below to get started — all data syncs instantly to Firebase.</p>
+            <h2 class="welcome-title">Welcome to <span id="welcomeTitle">CVAT Tracker</span></h2>
+            <p class="welcome-subtitle" id="welcomeSubtitle">Track your video annotations with precision. Add entries below to get started — all data syncs instantly to Firebase.</p>
           </div>          <div class="home-grid">
 
             <!-- Add Entry Form -->
@@ -228,14 +254,21 @@
                 <div class="form-group">
                   <label class="form-label" for="folderName">Folder Name</label>
                   <input type="text" class="form-input" id="folderName" placeholder="e.g., 23424_40_12_0" autocomplete="off">
-                  <div class="form-hint">Format: XXXXX_AA_BB_CC_X — position key extracted from AA_BB_CC</div>
+                  <div class="form-hint" id="folderNameHint">Format: XXXXX_AA_BB_CC_X — position key extracted from AA_BB_CC</div>
                   <div class="form-error">Folder name is required</div>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="totalFrames">Total Frames</label>
+                  <label class="form-label" id="framesFieldLabel" for="totalFrames">Total Frames</label>
                   <input type="number" class="form-input" id="totalFrames" placeholder="e.g., 1500" min="1">
                   <div class="form-error">Enter a valid positive number</div>
+                </div>
+
+                <!-- BBox annotation count — shown only for bbox projects -->
+                <div class="form-group" id="annotFormGroup" style="display:none;">
+                  <label class="form-label" id="annotFieldLabel" for="totalAnnotationsInput">Total Bounding Boxes</label>
+                  <input type="number" class="form-input" id="totalAnnotationsInput" placeholder="e.g., 4200" min="0">
+                  <div class="form-hint">Total number of bounding boxes in this folder</div>
                 </div>
 
                 <div class="form-group">
@@ -273,7 +306,7 @@
               <div class="mini-stats">
                 <div class="mini-stat purple">
                   <div class="mini-stat-val" id="homeTotalVideos">0</div>
-                  <div class="mini-stat-lbl">Videos</div>
+                  <div class="mini-stat-lbl" id="homeTotalVideosLbl">Videos</div>
                 </div>
                 <div class="mini-stat emerald">
                   <div class="mini-stat-val" id="homeTotalFrames">0</div>
@@ -369,9 +402,9 @@
 
           <div class="stats-grid">
             <div class="stat-card purple">
-              <div class="stat-card-icon">🎬</div>
+              <div class="stat-card-icon" id="dashVideosIcon">🎬</div>
               <div class="stat-card-value" id="dashTotalVideos">0</div>
-              <div class="stat-card-label">Total Videos</div>
+              <div class="stat-card-label" id="dashVideosLabel">Total Videos</div>
             </div>
             <div class="stat-card emerald">
               <div class="stat-card-icon">🎞️</div>
