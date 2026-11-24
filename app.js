@@ -244,6 +244,28 @@ function applyProjectConfig() {
     annotTh.textContent = metric;
   }
 
+  // ----- Data table item # header (singular of item label) -----
+  const itemNumTh = document.getElementById('itemNumTh');
+  if (itemNumTh) itemNumTh.textContent = `${singularLabel(item)} #`;
+
+  // ----- Avg frames stat card label -----
+  const avgLbl = document.getElementById('dashAvgLabel');
+  if (avgLbl) avgLbl.textContent = `Avg Frames / ${singularLabel(item)}`;
+
+  // ----- Minutes breakdown labels -----
+  const completeItemsLbl = document.getElementById('dashCompleteItemsLabel');
+  if (completeItemsLbl) completeItemsLbl.textContent = `Total Frames (Complete ${item.toLowerCase()})`;
+  const contributingLbl = document.getElementById('dashContributingLabel');
+  if (contributingLbl) contributingLbl.textContent = `Complete ${item} Contributing`;
+
+  // ----- Notes card title -----
+  const notesCardTitle = document.getElementById('dashNotesCardTitle');
+  if (notesCardTitle) notesCardTitle.innerHTML = `<div class="card-title-icon">✎</div> ${singularLabel(item)} Notes &amp; Status`;
+
+  // ----- Status field label -----
+  const statusFieldLabel = document.getElementById('statusFieldLabel');
+  if (statusFieldLabel) statusFieldLabel.innerHTML = `${singularLabel(item)} Status <span class="optional-label">(Optional)</span>`;
+
   // ----- Dashboard: stat card labels -----
   const videosLabel = document.getElementById('dashVideosLabel');
   if (videosLabel) videosLabel.textContent = `Total ${item}`;

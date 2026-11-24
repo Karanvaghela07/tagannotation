@@ -261,7 +261,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="videoStatus">Video Status <span class="optional-label">(Optional)</span></label>
+                  <label class="form-label" id="statusFieldLabel" for="videoStatus">Status <span class="optional-label">(Optional)</span></label>
                   <select class="form-input" id="videoStatus">
                     <option value="">No status</option>
                     <option value="Remaining">Remaining</option>
@@ -274,7 +274,7 @@
 
                 <div class="form-group">
                   <label class="form-label" for="videoNotes">Notes <span class="optional-label">(Optional)</span></label>
-                  <textarea class="form-input form-textarea" id="videoNotes" placeholder="Add a note about this video..." maxlength="500"></textarea>
+                  <textarea class="form-input form-textarea" id="videoNotes" placeholder="Add a note..." maxlength="500"></textarea>
                   <div class="form-hint">Optional, up to 500 characters</div>
                 </div>
 
@@ -361,7 +361,7 @@
               <thead>
                 <tr>
                   <th>Series</th>
-                  <th>Video #</th>
+                  <th id="itemNumTh">Video #</th>
                   <th>Folder Name</th>
                   <th>Frames</th>
                   <th id="annotationsTh">Annotations</th>
@@ -376,7 +376,7 @@
                     <div class="empty-state">
                       <div class="empty-state-icon">◫</div>
                       <div class="empty-state-text">No entries yet</div>
-                      <div class="empty-state-sub">Go to Home to add your first video entry</div>
+                      <div class="empty-state-sub" id="dataEmptySub">Go to Home to add your first entry</div>
                     </div>
                   </td>
                 </tr>
@@ -408,7 +408,7 @@
             <div class="stat-card amber">
               <div class="stat-card-icon">◈</div>
               <div class="stat-card-value" id="dashAvgFrames">0</div>
-              <div class="stat-card-label">Avg Frames / Video</div>
+              <div class="stat-card-label" id="dashAvgLabel">Avg Frames / Video</div>
             </div>
           </div>
 
@@ -460,7 +460,7 @@
 
             <div class="minutes-breakdown" id="minutesBreakdown">
               <div class="minutes-breakdown-item">
-                <span class="minutes-breakdown-label">Total Frames (Complete videos)</span>
+                <span class="minutes-breakdown-label" id="dashCompleteItemsLabel">Total Frames (Complete)</span>
                 <span class="minutes-breakdown-value" id="dashTotalFramesMinutes">0</span>
               </div>
               <div class="minutes-breakdown-item">
@@ -468,7 +468,7 @@
                 <span class="minutes-breakdown-value" id="dashFpsLabel">15 fps</span>
               </div>
               <div class="minutes-breakdown-item">
-                <span class="minutes-breakdown-label">Complete Videos Contributing</span>
+                <span class="minutes-breakdown-label" id="dashContributingLabel">Complete Items Contributing</span>
                 <span class="minutes-breakdown-value" id="dashTotalVideosMinutes">0</span>
               </div>
             </div>
@@ -528,10 +528,7 @@
 
           <div class="card dashboard-notes-card">
             <div class="card-header">
-              <div class="card-title">
-                <div class="card-title-icon">✎</div>
-                Video Notes &amp; Status
-              </div>
+              <div class="card-title" id="dashNotesCardTitle">Notes &amp; Status</div>
             </div>
             <div class="dashboard-notes-list" id="dashboardNotes">
               <div class="empty-state" style="padding:32px;">
